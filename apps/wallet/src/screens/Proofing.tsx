@@ -3,7 +3,8 @@ import { Text, View } from 'react-native';
 import { toBase64 } from '@mosipid/core';
 import { useI18n, useBrand, Button, Card, ErrorBox, Field, H, P, Screen } from '@mosipid/mobile-kit';
 import { DocumentAutoCapture } from './Capture';
-import { DocumentCapture, CapturedDocument } from './DocumentCapture';
+import { DocumentCapture } from './DocumentCapture';
+import { PickedDocument, UploadDocument } from './UploadDocument';
 import { LivenessCapture, SelfieResult } from './Liveness';
 import { captureAvailable, readBase64 } from '../../modules/mosipid-capture';
 import { nfcAvailable, openNfcSettings, readChipWithMrz } from '../nfc/reader';
@@ -37,7 +38,7 @@ const errText = (t: (k: string) => string, code?: string) => (code && t('err.' +
 /** Optical path: document (auto-capture or upload of image/PDF) → liveness selfie → issuer checks MRZ + face match + liveness. */
 export function OcrProofing({ sid, api, onVerified, onCancel }: { sid: string; api: string; onVerified: () => void; onCancel: () => void }) {
   const { t } = useI18n();
-  const [doc, setDoc] = useState<CapturedDocument | { fallbackImage: string } | null>(null);
+  const [doc, setDoc] = useState<PickedDocument | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const labels = [t('w.step.document'), t('w.step.selfie'), t('w.step.verify')];
@@ -47,7 +48,7 @@ export function OcrProofing({ sid, api, onVerified, onCancel }: { sid: string; a
     try {
       const payload: Record<string, unknown> = { selfie: s.selfie, turn_left: s.turnLeft, turn_right: s.turnRight, liveness_report: s.report };
       if (doc && 'uris' in doc) { payload.images = await Promise.all(doc.uris.map(readBase64)); payload.ocr_text = doc.ocrText; payload.capture_source = doc.source; }
-      else if (doc) { payload.image = doc.fallbackImage; payload.capture_source = 'camera'; }
+      else if (doc) { payload.image = doc.fallbackImage; payload.capture_source = doc.uri ? 'upload' : 'camera'; }
       await post(api, `/api/proofing/${sid}/ocr`, payload);
       onVerified();
     } catch (e: any) {
@@ -62,7 +63,10 @@ export function OcrProofing({ sid, api, onVerified, onCancel }: { sid: string; a
       <ErrorBox message={err} />
       {busy ? <Card><H>{t('w.proof.checking')}</H><P muted>{t('w.proof.checkingHint')}</P></Card>
         : !doc ? (captureAvailable ? <DocumentCapture onDone={setDoc} onCancel={onCancel} />
-          : <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })} onCaptured={(img) => setDoc({ fallbackImage: img })} />)
+          : <View style={{ gap: 12 }}>
+              <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })} onCaptured={(img) => setDoc({ fallbackImage: img, uri: '' })} />
+              <UploadDocument onDone={setDoc} />
+            </View>)
         : <LivenessCapture onDone={submit} />}
     </Screen>
   );
@@ -109,7 +113,7 @@ export function NfcProofing({ sid, api, onVerified, onCancel }: { sid: string; a
   if (scanning) return (
     <Screen title={t('w.nfc.scanMrz')} onBack={() => setScanning(false)}>
       {captureAvailable
-        ? <DocumentCapture onCancel={() => setScanning(false)} onDone={(d) => { setDocNo(d.mrz.documentNumber); setDob(d.mrz.birthDate); setExp(d.mrz.expiryDate); setScanning(false); }} />
+        ? <DocumentCapture onCancel={() => setScanning(false)} onDone={(d) => { if ('mrz' in d) { setDocNo(d.mrz.documentNumber); setDob(d.mrz.birthDate); setExp(d.mrz.expiryDate); } setScanning(false); }} />
         : <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })}
             onCaptured={(_img, m) => { if (m) { setDocNo(m.documentNumber); setDob(m.birthDate); setExp(m.expiryDate); } setScanning(false); }} />}
     </Screen>
