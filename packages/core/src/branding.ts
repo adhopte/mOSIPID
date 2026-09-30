@@ -1,0 +1,22 @@
+export type Theme = 'light' | 'dark' | 'auto';
+export interface Branding {
+  tenant: string;
+  kind: 'wallet' | 'issuer' | 'verifier';
+  /** display name per language; falls back to `en` */
+  names: Record<string, string>;
+  logoUrl?: string;
+  colors: { primary: string; secondary: string; background: string; surface: string; text: string; accent: string };
+  theme: Theme;
+  updatedAt?: string;
+}
+
+export const DEFAULT_BRANDING: Record<string, Branding> = {
+  wallet: { tenant: 'wallet', kind: 'wallet', names: { en: 'MOSIP-ID Wallet', fr: 'Portefeuille MOSIP-ID', es: 'Cartera MOSIP-ID' }, colors: { primary: '#1F4FD8', secondary: '#0B1F5C', background: '#F5F7FB', surface: '#FFFFFF', text: '#101828', accent: '#F59E0B' }, theme: 'auto' },
+  'issuer-id': { tenant: 'issuer-id', kind: 'issuer', names: { en: 'IN Groupe (Mock) Identity Issuer', fr: "Émetteur d'identité IN Groupe (fictif)", es: 'Emisor de identidad IN Groupe (simulado)' }, colors: { primary: '#0E7490', secondary: '#083344', background: '#F0F9FF', surface: '#FFFFFF', text: '#0F172A', accent: '#F97316' }, theme: 'light' },
+  'issuer-university': { tenant: 'issuer-university', kind: 'issuer', names: { en: 'Bharat Institute of Technology', fr: 'Institut de technologie Bharat', es: 'Instituto de Tecnología Bharat' }, colors: { primary: '#7C2D12', secondary: '#431407', background: '#FFF7ED', surface: '#FFFFFF', text: '#1C1917', accent: '#CA8A04' }, theme: 'light' },
+  'verifier-electricity': { tenant: 'verifier-electricity', kind: 'verifier', names: { en: 'VoltEdge Electricity', fr: 'VoltEdge Électricité', es: 'VoltEdge Electricidad' }, colors: { primary: '#CA8A04', secondary: '#422006', background: '#FEFCE8', surface: '#FFFFFF', text: '#1C1917', accent: '#0EA5E9' }, theme: 'light' },
+  'verifier-university': { tenant: 'verifier-university', kind: 'verifier', names: { en: 'Bharat Institute of Technology', fr: 'Institut de technologie Bharat', es: 'Instituto de Tecnología Bharat' }, colors: { primary: '#7C2D12', secondary: '#431407', background: '#FFF7ED', surface: '#FFFFFF', text: '#1C1917', accent: '#CA8A04' }, theme: 'light' },
+  'verifier-proximity': { tenant: 'verifier-proximity', kind: 'verifier', names: { en: 'MOSIP-ID Proximity Verifier', fr: 'Vérificateur de proximité MOSIP-ID', es: 'Verificador de proximidad MOSIP-ID' }, colors: { primary: '#047857', secondary: '#022C22', background: '#ECFDF5', surface: '#FFFFFF', text: '#0F172A', accent: '#F59E0B' }, theme: 'auto' },
+};
+
+export const brandName = (b: Branding, lang: string) => b.names[lang] ?? b.names.en ?? b.tenant;

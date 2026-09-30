@@ -1,0 +1,10 @@
+node_modules
+dist
+.expo
+*.log
+.env
+.env.local
+.data
+coverage
+ios
+android
