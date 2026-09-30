@@ -1,29 +1,138 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in</title><link rel="stylesheet" href="/shared/base.css"></head>
+<html lang="en" data-title-key="vu.title">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>University</title>
+<meta name="theme-color" content="#431407">
+<link rel="stylesheet" href="/shared/base.css"><link rel="stylesheet" href="/site.css"><link rel="icon" href="/shared/brand/favicon.png">
+<style>
+  .tl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; position: relative; margin-top: 26px; } .tl::before { content: ""; position: absolute; left: 6%; right: 6%; top: 27px; height: 4px; background: var(--line); border-radius: 2px; }
+  .tl .s { position: relative; text-align: center; } .tl .dot { width: 54px; height: 54px; border-radius: 50%; margin: 0 auto 10px; display: grid; place-items: center; background: var(--primary); color: #fff; font-weight: 800; position: relative; box-shadow: 0 0 0 6px var(--bg); } .tl p { color: var(--muted); font-size: .9rem; margin: 4px 0 0; }
+  @media (max-width: 640px) { .tl { grid-template-columns: 1fr 1fr; } .tl::before { display: none; } }
+  .date { display: inline-block; background: var(--primary); color: #fff; border-radius: 12px; padding: 6px 10px; text-align: center; font-weight: 800; line-height: 1.1; } .date small { display: block; font-size: .65rem; opacity: .85; letter-spacing: .08em; }
+  .scene { height: 120px; border-radius: 14px; margin: -8px -8px 14px; display: grid; place-items: center; color: #fff; } .scene svg { width: 54px; height: 54px; }
+  .cert { position: relative; background: #fffaf0; color: #3b2a1a; border-radius: 14px; padding: 26px 22px; text-align: center; border: 10px solid transparent; border-image: repeating-linear-gradient(45deg, #b7791f 0 6px, #f6e0a8 6px 12px) 10; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+  .cert h3 { font-family: Georgia, 'Times New Roman', serif; font-size: 1.15rem; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 4px; } .cert .nm { font-family: Georgia, serif; font-size: 1.7rem; font-style: italic; margin: 10px 0; border-bottom: 1px solid #b7791f55; display: inline-block; padding: 0 18px 6px; } .cert .seal { position: absolute; right: 18px; bottom: 14px; width: 64px; height: 64px; }
+</style>
+</head>
 <body>
-<header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none"></a><span data-lang-switcher></span><button class="ghost hidden" id="logout" data-i18n="v.logout">Sign out</button></div></header>
-<main>
-<section id="login">
-  <h1 data-i18n="v.university.title"></h1>
-  <p class="lead" data-i18n="v.university.lead"></p>
-  <div class="card row" style="align-items:flex-start;gap:24px">
-    <div style="flex:1;min-width:240px">
-      <button class="btn" id="go" data-i18n="v.signin">Sign in with wallet</button>
-      <div id="box" class="hidden">
-        <ol class="steps"><li data-i18n="v.step1">Open your wallet and tap “Scan”.</li><li data-i18n="v.step2">Scan this QR code, or open it in your wallet on this device.</li><li data-i18n="v.step3">Review what is shared and approve.</li></ol>
-        <p><a id="deep" class="btn secondary" data-i18n="v.openWallet">Open in wallet</a></p>
-        <p><span class="pill" id="st" data-i18n="v.waiting">Waiting for your wallet…</span></p>
-        <p class="muted" data-i18n="v.willShare">This site will ask for:</p><ul id="asks" class="muted"></ul>
-      </div>
-      <div id="err" class="msg err hidden"></div>
-    </div>
-    <div class="qrbox hidden" id="qrbox"><img id="qr" alt="QR code"></div>
+<div class="util"><div class="wrap"><span><span data-i18n="vu.util">Admissions helpline +91 80 4000 1234</span></span><span data-lang-switcher></span></div></div>
+<nav class="main"><div class="wrap">
+  <a class="logo-mark" href="/university.html"><img class="logo" alt="">
+    <svg class="fallback" viewBox="0 0 40 40"><rect width="40" height="40" rx="11" fill="var(--primary)"/><path d="M20 8L6 15l14 7 14-7z" fill="#fff"/><path d="M12 19v6c0 2 3.6 4 8 4s8-2 8-4v-6l-8 4z" fill="#fff" opacity=".85"/></svg><span data-brand-name>University</span></a>
+  <div class="links"><a href="#programs" data-i18n="vu.nav.programs">Programs</a><a href="#research" data-i18n="vu.nav.research">Research</a><a href="#campus" data-i18n="vu.nav.campus">Campus</a><a href="#admissions" data-i18n="vu.nav.admissions">Admissions</a></div>
+  <button class="btn" data-signin data-when="out" data-i18n="vu.nav.signin">Student &amp; alumni login</button>
+  <button class="btn secondary hidden" data-signout data-when="in" data-i18n="v.logout">Sign out</button>
+</div></nav>
+
+<main style="padding:0;max-width:none">
+<div data-when="out">
+<section class="hero"><div class="wrap">
+  <div>
+    <span class="chip"><span data-icon="award" style="width:16px;height:16px;display:inline-block"></span> <span data-i18n="vu.hero.chip">Est. 1904 · NAAC A++</span></span>
+    <h1 data-i18n="vu.hero.title">Where curiosity becomes careers.</h1>
+    <p class="lead" data-i18n="vu.hero.text">World-class engineering, science and management programmes on a 300-acre campus. Students and alumni sign in with their verified degree attestation – no passwords.</p>
+    <div class="cta"><button class="btn lg light" data-signin data-i18n="vu.hero.cta">Sign in with my degree</button><a class="btn lg ghost-w" href="#programs" data-i18n="vu.hero.programs">Explore programmes</a></div>
+    <div class="chips"><span class="chip"><span data-icon="shield" style="width:16px;height:16px;display:inline-block"></span> <span data-i18n="vu.hero.secure">Tamper-proof attestation</span></span><span class="chip"><span data-icon="globe" style="width:16px;height:16px;display:inline-block"></span> <span data-i18n="vu.hero.global">Recognised worldwide</span></span></div>
   </div>
-</section>
-<section id="account" class="hidden"></section>
+  <svg class="art" viewBox="0 0 640 460" role="img" aria-label="University campus with a domed main building, columns, a flag and trees">
+    <defs><radialGradient id="uSun"><stop offset="0" stop-color="#fde68a" stop-opacity=".9"/><stop offset="1" stop-color="#fde68a" stop-opacity="0"/></radialGradient><linearGradient id="uWall" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff1dd"/><stop offset="1" stop-color="#f5d3a8"/></linearGradient></defs>
+    <circle cx="520" cy="110" r="120" fill="url(#uSun)" class="float"/><circle cx="520" cy="110" r="44" fill="#fcd34d"/>
+    <g fill="#fff" opacity=".85"><g class="drift"><ellipse cx="110" cy="100" rx="48" ry="15"/><ellipse cx="140" cy="88" rx="30" ry="14"/></g><g class="drift" style="animation-duration:24s"><ellipse cx="380" cy="60" rx="38" ry="11"/><ellipse cx="402" cy="52" rx="22" ry="10"/></g></g>
+    <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".85"><g class="drift" style="animation-duration:14s"><path d="M250 120q8-9 16 0q8-9 16 0"/><path d="M300 150q6-7 12 0q6-7 12 0"/></g></g>
+    <path d="M0 350 C120 318 250 338 380 334 S570 318 640 332 L640 460 L0 460Z" fill="#3f7d3c" opacity=".9"/>
+    <!-- wings -->
+    <g><rect x="84" y="262" width="126" height="116" rx="4" fill="url(#uWall)"/><rect x="430" y="262" width="126" height="116" rx="4" fill="url(#uWall)"/><path d="M76 266L147 232l71 34z" fill="#7c2d12"/><path d="M422 266l71-34 71 34z" fill="#7c2d12"/>
+      <g fill="#7c4a2d" opacity=".75"><rect x="100" y="282" width="20" height="28" rx="10"/><rect x="136" y="282" width="20" height="28" rx="10"/><rect x="172" y="282" width="20" height="28" rx="10"/><rect x="100" y="326" width="20" height="28" rx="10"/><rect x="136" y="326" width="20" height="28" rx="10"/><rect x="172" y="326" width="20" height="28" rx="10"/>
+      <rect x="446" y="282" width="20" height="28" rx="10"/><rect x="482" y="282" width="20" height="28" rx="10"/><rect x="518" y="282" width="20" height="28" rx="10"/><rect x="446" y="326" width="20" height="28" rx="10"/><rect x="482" y="326" width="20" height="28" rx="10"/><rect x="518" y="326" width="20" height="28" rx="10"/></g></g>
+    <!-- main hall -->
+    <g><rect x="196" y="246" width="248" height="132" fill="url(#uWall)"/><path d="M184 250L320 190l136 60z" fill="#fff8ef" stroke="#c9a77c" stroke-width="3"/><circle cx="320" cy="224" r="13" fill="var(--accent)"/>
+      <path d="M262 198a58 58 0 0 1 116 0z" fill="var(--accent)"/><path d="M282 198a38 38 0 0 1 76 0z" fill="#fff" opacity=".25"/><rect x="317" y="128" width="6" height="42" fill="#7c2d12"/>
+      <path d="M323 130 h46 q-12 10 0 22 h-46z" fill="#ef4444" class="float" style="animation-duration:2.6s"/>
+      <g fill="#fff" stroke="#d6bb94" stroke-width="1.5"><rect x="212" y="256" width="20" height="116" rx="4"/><rect x="250" y="256" width="20" height="116" rx="4"/><rect x="288" y="256" width="20" height="116" rx="4"/><rect x="332" y="256" width="20" height="116" rx="4"/><rect x="370" y="256" width="20" height="116" rx="4"/><rect x="408" y="256" width="20" height="116" rx="4"/></g>
+      <rect x="178" y="372" width="284" height="10" fill="#e7cfa9"/><rect x="164" y="382" width="312" height="10" fill="#dcc08f"/><rect x="150" y="392" width="340" height="10" fill="#cfae76"/></g>
+    <path d="M286 402h68l34 58H252z" fill="#ead9b8"/>
+    <!-- trees -->
+    <g><rect x="50" y="352" width="10" height="50" fill="#6b4423"/><circle cx="55" cy="336" r="34" fill="#2f6b2f"/><circle cx="36" cy="350" r="22" fill="#3c8a3c"/><rect x="590" y="346" width="10" height="56" fill="#6b4423"/><circle cx="595" cy="326" r="38" fill="#2f6b2f"/><circle cx="612" cy="346" r="22" fill="#3c8a3c"/></g>
+    <!-- floating cap -->
+    <g class="float" transform="translate(112 168) rotate(-12)"><path d="M0 0l40-18 40 18-40 18z" fill="#111827"/><path d="M16 12v18c0 6 11 10 24 10s24-4 24-10V12l-24 10z" fill="#1f2937"/><path d="M76 4v26" stroke="var(--accent)" stroke-width="3"/><circle cx="76" cy="34" r="4" fill="var(--accent)"/></g>
+    <!-- books -->
+    <g transform="translate(470 396)"><rect width="74" height="14" rx="3" fill="#2563eb"/><rect x="6" y="-14" width="64" height="14" rx="3" fill="#ef4444"/><rect x="2" y="-28" width="68" height="14" rx="3" fill="#f59e0b"/></g>
+  </svg>
+</div></section>
+
+<section class="stats"><div class="wrap"><div><b>25,000</b><span data-i18n="vu.stat.students">students</span></div><div><b>1,200+</b><span data-i18n="vu.stat.faculty">faculty members</span></div><div><b>98%</b><span data-i18n="vu.stat.place">placement rate</span></div><div><b>120</b><span data-i18n="vu.stat.years">years of excellence</span></div></div></section>
+
+<section class="block" id="programs"><div class="wrap">
+  <div class="kicker" data-i18n="vu.prog.kicker">Programmes</div><h2 class="title" data-i18n="vu.prog.title">Learn from the best, build what matters</h2><p class="sub" data-i18n="vu.prog.text">Four schools, 60+ degree programmes and interdisciplinary labs where students ship real projects.</p>
+  <div class="grid3">
+    <div class="tile"><div class="ico" data-icon="chip"></div><h3>B.Tech</h3><p data-i18n="vu.prog.1">Computer Science, Electrical, Mechanical, Civil and AI &amp; Data Science.</p></div>
+    <div class="tile"><div class="ico" data-icon="flask"></div><h3>M.Sc</h3><p data-i18n="vu.prog.2">Data Science, Physics, Chemistry and Biotechnology with research thesis.</p></div>
+    <div class="tile"><div class="ico" data-icon="briefcase"></div><h3>MBA</h3><p data-i18n="vu.prog.3">Finance, Analytics and Sustainable Business with industry residencies.</p></div>
+    <div class="tile"><div class="ico" data-icon="book"></div><h3>Ph.D</h3><p data-i18n="vu.prog.4">Fully funded fellowships across 40 research centres.</p></div>
+  </div>
+</div></section>
+
+<section class="block alt" id="research"><div class="wrap split">
+  <div><div class="kicker" data-i18n="vu.res.kicker">Research</div><h2 class="title" data-i18n="vu.res.title">Ideas that leave the lab</h2><p class="sub" data-i18n="vu.res.text">From clean-energy materials to language technologies for Indian languages, our researchers publish, patent and start companies.</p>
+    <ul class="tick"><li data-i18n="vu.res.f1">320 patents filed in five years</li><li data-i18n="vu.res.f2">Incubator with 90 active start-ups</li><li data-i18n="vu.res.f3">Partnerships with 70 universities worldwide</li></ul></div>
+  <div class="chart-card"><h4 data-i18n="vu.res.chart">Publications per year</h4><div id="pubChart"></div></div>
+</div></section>
+
+<section class="block" id="campus"><div class="wrap">
+  <div class="kicker" data-i18n="vu.camp.kicker">Campus life</div><h2 class="title" data-i18n="vu.camp.title">More than lectures</h2>
+  <div class="grid3">
+    <div class="tile"><div class="scene" style="background:linear-gradient(135deg,var(--primary),var(--accent))"><span data-icon="users"></span></div><h3 data-i18n="vu.camp.1.t">Student clubs</h3><p data-i18n="vu.camp.1.d">120 clubs from robotics to classical dance.</p></div>
+    <div class="tile"><div class="scene" style="background:linear-gradient(135deg,var(--secondary),var(--primary))"><span data-icon="flask"></span></div><h3 data-i18n="vu.camp.2.t">Open labs</h3><p data-i18n="vu.camp.2.d">24/7 makerspaces, GPU clusters and a biosafety lab.</p></div>
+    <div class="tile"><div class="scene" style="background:linear-gradient(135deg,var(--accent),var(--secondary))"><span data-icon="home"></span></div><h3 data-i18n="vu.camp.3.t">Residential campus</h3><p data-i18n="vu.camp.3.d">Hostels, food courts and a sports complex for 10,000 residents.</p></div>
+  </div>
+  <h3 style="margin-top:44px" data-i18n="vu.news.title">News &amp; events</h3>
+  <div class="grid3">
+    <div class="tile"><span class="date">14<small>OCT</small></span><h3 data-i18n="vu.news.1.t">Open day for prospective students</h3><p data-i18n="vu.news.1.d">Meet faculty, tour the labs and talk to current students.</p></div>
+    <div class="tile"><span class="date">02<small>NOV</small></span><h3 data-i18n="vu.news.2.t">National hackathon final</h3><p data-i18n="vu.news.2.d">48 teams build solutions for rural healthcare.</p></div>
+    <div class="tile"><span class="date">20<small>DEC</small></span><h3 data-i18n="vu.news.3.t">Convocation ceremony</h3><p data-i18n="vu.news.3.d">Degrees issued digitally to every graduate’s wallet.</p></div>
+  </div>
+</div></section>
+
+<section class="block alt" id="admissions"><div class="wrap">
+  <div class="kicker" data-i18n="vu.adm.kicker">Admissions</div><h2 class="title" data-i18n="vu.adm.title">Your path to joining us</h2>
+  <div class="tl"><div class="s"><div class="dot">1</div><b data-i18n="vu.adm.1.t">Apply</b><p data-i18n="vu.adm.1.d">Online form and documents</p></div><div class="s"><div class="dot">2</div><b data-i18n="vu.adm.2.t">Entrance exam</b><p data-i18n="vu.adm.2.d">National test scores accepted</p></div><div class="s"><div class="dot">3</div><b data-i18n="vu.adm.3.t">Interview</b><p data-i18n="vu.adm.3.d">Short conversation with faculty</p></div><div class="s"><div class="dot">4</div><b data-i18n="vu.adm.4.t">Enrol</b><p data-i18n="vu.adm.4.d">Pay fees and get your student ID</p></div></div>
+  <div class="tile" style="margin-top:34px;display:flex;gap:18px;align-items:center;flex-wrap:wrap"><div class="ico" data-icon="award"></div><div style="flex:1;min-width:220px"><h3 style="margin:0" data-i18n="vu.alumni.t">Already a graduate?</h3><p data-i18n="vu.alumni.d">Sign in with the degree attestation in your wallet to request transcripts, join the alumni network and access the career centre.</p></div><button class="btn" data-signin data-i18n="vu.nav.signin">Student &amp; alumni login</button></div>
+</div></section>
+</div>
+<div data-when="in" class="hidden" id="account"></div>
 </main>
-<footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
-<script src="/config.js"></script><script src="/shared/app.js"></script><script src="/login.js"></script>
-<script>Login.start({ tenant: 'verifier-university', flow: 'university', titleKey: 'v.university.title', asks: ['claim.student_id','claim.given_name','claim.family_name','claim.degree','claim.field_of_study','claim.graduation_year','claim.university'], render: (me, esc, t) => `<h1>${esc(t('v.welcome'))}, ${esc(me.claims.given_name)} ${esc(me.claims.family_name)}</h1><div class="grid"><div class="card"><h3>${esc(me.claims.degree)} — ${esc(me.claims.field_of_study)}</h3><p class=muted>${esc(me.claims.university || '')}</p><p><strong>${esc(t('claim.student_id'))}</strong><br><span class=mono>${esc(me.claims.student_id)}</span></p><p><strong>${esc(t('claim.graduation_year'))}</strong><br>${esc(me.claims.graduation_year)}</p></div><div class="card"><h3>${esc(t('v.university.services'))}</h3><ul><li>${esc(t('v.university.s1'))}</li><li>${esc(t('v.university.s2'))}</li><li>${esc(t('v.university.s3'))}</li></ul><p class=muted>${esc(t('v.issuedBy'))}: ${esc(me.issuer)}</p></div></div>` });</script>
+
+<footer class="site"><div class="wrap"><div class="cols">
+  <div><div class="logo-mark" style="color:#fff"><svg class="fallback" viewBox="0 0 40 40" style="width:30px;height:30px"><rect width="40" height="40" rx="11" fill="var(--accent)"/><path d="M20 8L6 15l14 7 14-7z" fill="#fff"/></svg><span data-brand-name>University</span></div><p style="opacity:.75;max-width:34ch" data-i18n="vu.foot.tag">Knowledge, character and service since 1904.</p></div>
+  <div><h5 data-i18n="vu.foot.c1">Academics</h5><a href="#programs" data-i18n="vu.nav.programs">Programs</a><a href="#research" data-i18n="vu.nav.research">Research</a><a href="#admissions" data-i18n="vu.nav.admissions">Admissions</a></div>
+  <div><h5 data-i18n="vu.foot.c2">Community</h5><a href="#campus" data-i18n="vu.nav.campus">Campus</a><a href="#" data-i18n="vu.foot.alumni">Alumni</a><a href="#" data-i18n="vu.foot.news">News</a></div>
+  <div><h5 data-i18n="vu.foot.c3">Contact</h5><a href="#" data-i18n="vu.foot.map">Campus map</a><a href="#" data-i18n="ve.foot.privacy">Privacy</a><a href="/" data-i18n="ve.foot.demo">Demo home</a></div>
+</div><div class="legal" data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</div></div></footer>
+
+<script src="/config.js"></script><script src="/shared/app.js"></script><script src="/vendor/jsQR.js"></script><script src="/icons.js"></script><script src="/login.js"></script>
+<script>
+(function () {
+  const render = (me, esc, t) => {
+    const c = me.claims, r = Seeded(c.student_id || c.family_name), sem = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'], credits = sem.map(() => Math.round(20 + r() * 6));
+    const total = credits.reduce((a, b) => a + b, 0);
+    const initials = esc(((c.given_name || '?')[0] + (c.family_name || '?')[0]).toUpperCase());
+    const svc = [['book', 'vu.dash.s1', 'vu.dash.s1d'], ['users', 'vu.dash.s2', 'vu.dash.s2d'], ['briefcase', 'vu.dash.s3', 'vu.dash.s3d'], ['calendar', 'vu.dash.s4', 'vu.dash.s4d']]
+      .map(([i, a, b]) => `<div class="tile"><div class="ico">${Icons.svg(i)}</div><h3>${esc(t(a))}</h3><p>${esc(t(b))}</p></div>`).join('');
+    return `<div class="dash-hero"><div class="wrap"><div class="pfp">${initials}</div><div><h1>${esc(t('v.welcome'))}, ${esc(c.given_name)} ${esc(c.family_name)}</h1><p>${esc(c.degree)} · ${esc(c.field_of_study)} · ${esc(c.graduation_year)}</p></div></div></div>
+    <div class="wrap dash">
+      <div class="kpis"><div class="kpi"><small>${esc(t('claim.student_id'))}</small><b class="mono" style="font-size:1.15rem">${esc(c.student_id)}</b></div><div class="kpi"><small>${esc(t('claim.degree'))}</small><b style="font-size:1.25rem">${esc(c.degree)}</b></div><div class="kpi"><small>${esc(t('claim.graduation_year'))}</small><b>${esc(c.graduation_year)}</b></div><div class="kpi"><small>${esc(t('vu.dash.credits'))}</small><b>${total}</b><div class="delta">${esc(t('vu.dash.complete'))}</div></div></div>
+      <div class="dgrid"><div style="display:grid;gap:18px">
+        <div class="cert"><h3>${esc(c.university || t('vu.dash.univ'))}</h3><div style="font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;opacity:.7">${esc(t('vu.dash.certTitle'))}</div>
+          <div class="nm">${esc(c.given_name)} ${esc(c.family_name)}</div><div>${esc(t('vu.dash.certText'))}</div><div style="font-size:1.25rem;font-weight:800;margin:6px 0">${esc(c.degree)} — ${esc(c.field_of_study)}</div><div style="opacity:.75">${esc(c.graduation_year)}</div>
+          <svg class="seal" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#b7791f"/><circle cx="32" cy="32" r="20" fill="none" stroke="#f6e0a8" stroke-width="2" stroke-dasharray="3 3"/><path d="M32 18l4 9 10 1-7.5 6.5 2.5 9.5-9-5-9 5 2.5-9.5L18 28l10-1z" fill="#f6e0a8"/><path d="M22 52l-4 10 8-4 6 6 6-6 8 4-4-10" fill="#9c6212" opacity=".0"/></svg></div>
+        <div class="chart-card"><h4>${esc(t('vu.dash.chart'))}</h4>${Charts.bars(credits, sem, { h: 210, color: 'var(--primary)' })}</div></div>
+        <div style="display:grid;gap:18px"><div class="chart-card"><div class="verified"><span class="shield">${Icons.svg('shield')}</span><div><h4 style="margin:0 0 4px">${esc(t('vu.dash.verified'))}</h4><p class="muted" style="margin:0 0 8px;font-size:.9rem">${esc(t('v.issuedBy'))}:<br><b>${esc(me.issuer)}</b></p><span class="pill ok">SD-JWT VC · ES256</span></div></div></div>
+          <div class="chart-card" style="text-align:center"><h4>${esc(t('vu.dash.progress'))}</h4><div style="width:150px;margin:0 auto">${Charts.ring(100, '100%', { color: 'var(--ok)' })}</div></div></div></div>
+      <h3 style="margin-top:28px">${esc(t('vu.dash.services'))}</h3><div class="grid3">${svc}</div></div>`;
+  };
+  Login.start({ tenant: 'verifier-university', flow: 'university', titleKey: 'vu.title', render,
+    asks: ['claim.student_id', 'claim.given_name', 'claim.family_name', 'claim.degree', 'claim.field_of_study', 'claim.graduation_year', 'claim.university'] });
+  document.getElementById('pubChart').innerHTML = Charts.line([210, 248, 290, 341, 402, 470, 538], ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], { h: 220 });
+})();
+</script>
 </body></html>

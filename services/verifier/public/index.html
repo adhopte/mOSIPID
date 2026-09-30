@@ -1,32 +1,35 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verifier</title><link rel="stylesheet" href="/shared/base.css"></head>
+<title>Blue Tiger · Verifier demo</title><link rel="stylesheet" href="/shared/base.css"><link rel="stylesheet" href="/site.css"><link rel="icon" href="/shared/brand/favicon.png">
+<style>.pick { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 30px; } .pick a { text-decoration: none; color: inherit; display: block; border-radius: 22px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 14px 40px rgba(16,24,40,.1); transition: transform .2s; } .pick a:hover { transform: translateY(-4px); } .pick .top { height: 190px; display: grid; place-items: center; color: #fff; } .pick .top svg { width: 92px; height: 92px; } .pick .bd { padding: 20px 22px 24px; } .pick h3 { margin: 0 0 6px; } .pick p { color: var(--muted); margin: 0 0 14px; } .pick img.bl { max-height: 36px; margin-bottom: 10px; display: none; }
+.how { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 26px; }</style></head>
 <body>
-<header class="top"><div class="in"><span class="brand" data-i18n="v.home.brand">Wallet login demo</span><span data-lang-switcher></span></div></header>
-<main>
-<h1 data-i18n="v.home.title">Sign in with your wallet</h1>
-<p class="lead" data-i18n="v.home.lead">Two relying parties, two credential types: use your digital ID for the utility, your degree attestation for the university.</p>
-<div class="grid">
-  <a class="card" id="c1" href="/electricity.html" style="text-decoration:none;color:inherit;border-top:6px solid var(--primary)"><img class="bl" alt="" style="max-height:44px;display:none;margin-bottom:8px"><h3 data-brand-name></h3><p class="muted" data-i18n="v.home.electricity">Sign in to your electricity account using your digital ID (mdoc).</p><span class="btn" data-i18n="v.home.go">Continue</span></a>
-  <a class="card" id="c2" href="/university.html" style="text-decoration:none;color:inherit;border-top:6px solid var(--primary)"><img class="bl" alt="" style="max-height:44px;display:none;margin-bottom:8px"><h3 data-brand-name></h3><p class="muted" data-i18n="v.home.university">Sign in to the university portal using your degree attestation (SD-JWT VC).</p><span class="btn" data-i18n="v.home.go">Continue</span></a>
-</div>
+<div class="util"><div class="wrap"><span data-i18n="v.home.brand">Wallet login demo</span><span data-lang-switcher></span></div></div>
+<main style="max-width:var(--maxw)">
+  <div style="display:flex;gap:16px;align-items:center"><img src="/shared/brand/bluetiger-logo.png" alt="" width="64" height="64"><div><h1 style="margin:0" data-i18n="v.home.title">Sign in with your wallet</h1></div></div>
+  <p class="lead" data-i18n="v.home.lead">Two relying parties, two credential types: use your digital ID for the utility, your degree attestation for the university.</p>
+  <div class="pick">
+    <a id="c1" href="/electricity.html"><div class="top" style="background:linear-gradient(135deg,var(--secondary),var(--primary))"><span data-icon="bolt" style="width:92px;height:92px;display:block"></span></div><div class="bd"><img class="bl" alt=""><h3 data-brand-name></h3><p data-i18n="v.home.electricity">Sign in to your electricity account using your digital ID (mdoc).</p><span class="btn" data-i18n="v.home.go">Continue</span></div></a>
+    <a id="c2" href="/university.html"><div class="top" style="background:linear-gradient(135deg,var(--secondary),var(--primary))"><span data-icon="cap" style="width:92px;height:92px;display:block"></span></div><div class="bd"><img class="bl" alt=""><h3 data-brand-name></h3><p data-i18n="v.home.university">Sign in to the university portal using your degree attestation (SD-JWT VC).</p><span class="btn" data-i18n="v.home.go">Continue</span></div></a>
+  </div>
+  <h2 style="margin-top:44px" data-i18n="v.home.howTitle">Two ways to present</h2>
+  <div class="how"><div class="tile"><div class="ico" data-icon="phone"></div><h3 data-i18n="vs.online.title">Online</h3><p data-i18n="vs.online.text">Scan a QR code with your wallet, or open the link if the wallet is on this phone.</p></div>
+  <div class="tile"><div class="ico" data-icon="users"></div><h3 data-i18n="vs.person.title">In person</h3><p data-i18n="vs.person.text">Show the QR code from your wallet’s “Share in person” screen to this device’s camera.</p></div></div>
 </main>
 <footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
-<script src="/config.js"></script><script src="/shared/app.js"></script>
+<script src="/config.js"></script><script src="/shared/app.js"></script><script src="/icons.js"></script>
 <script>
 (async () => {
-  await App.init({ titleKey: 'v.home.title' });
+  await App.init({ titleKey: 'v.home.title' }); Icons.apply();
   const cfg = App.config;
   async function brand(id, tenant) {
     let b = cfg.defaults[tenant];
     try { const r = await Promise.race([fetch(cfg.adminUrl + '/api/branding/' + tenant), new Promise((_, j) => setTimeout(j, 4000))]); if (r.ok) b = await r.json(); } catch {}
-    const el = document.getElementById(id);
-    const paint = () => { el.querySelector('h3').textContent = b.names[App.lang] || b.names.en; };
+    const el = document.getElementById(id), paint = () => { el.querySelector('h3').textContent = b.names[App.lang] || b.names.en; };
     paint(); document.addEventListener('langchange', paint);
-    el.style.borderTopColor = b.colors.primary; el.querySelector('.btn').style.background = b.colors.primary;
+    el.querySelector('.top').style.background = `linear-gradient(135deg, ${b.colors.secondary}, ${b.colors.primary})`; el.querySelector('.btn').style.background = b.colors.primary;
     const img = el.querySelector('img.bl'); if (b.logoUrl) { img.src = b.logoUrl; img.style.display = 'block'; }
   }
   brand('c1', 'verifier-electricity'); brand('c2', 'verifier-university');
 })();
-</script>
-</body></html>
+</script></body></html>
