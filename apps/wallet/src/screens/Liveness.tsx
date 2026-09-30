@@ -21,10 +21,11 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [perm, requestPerm] = useCameraPermissions();
+  const [simple, setSimple] = useState(false);
 
   React.useEffect(() => { if (perm && !perm.granted && perm.canAskAgain) requestPerm(); }, [perm?.granted]);
 
-  if (!captureAvailable) {
+  if (!captureAvailable || simple) {
     return <SelfieCapture onDone={(r) => onDone({ selfie: r.selfie, turnLeft: r.frames[1], turnRight: r.frames[2], report: { method: 'timed_frames' } })} />;
   }
 
@@ -63,6 +64,7 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
         </>
       )}
       <ErrorBox message={error} />
+      {error && !started ? <Button kind="secondary" label={t('w.live.simple')} onPress={() => setSimple(true)} /> : null}
       {done ? <P muted style={{ textAlign: 'center' }}>{t('w.selfie.sending')}</P> : null}
     </View>
   );

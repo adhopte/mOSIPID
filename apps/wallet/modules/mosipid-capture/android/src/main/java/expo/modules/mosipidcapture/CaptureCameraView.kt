@@ -61,14 +61,16 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var provider: ProcessCameraProvider? = null
   private var imageCapture: ImageCapture? = null
   private var boundCases: List<UseCase> = emptyList()
+  private var lastState = "none"
   private val frames = java.util.concurrent.atomic.AtomicInteger(0)
   private var liveness: LivenessAnalyzer? = null
   private val analysisExecutor = Executors.newSingleThreadExecutor()
   private val ioExecutor = Executors.newSingleThreadExecutor()
   private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
+  // default implementation mode, exactly like expo-camera and the reference app (COMPATIBLE/TextureView never delivered a surface here)
   private val previewView = PreviewView(context).apply {
-    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+    elevation = 0f
     scaleType = PreviewView.ScaleType.FILL_CENTER
   }
 
@@ -112,8 +114,10 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
       try {
         val p = future.get()
         provider = p
-        // only release OUR use cases – another camera view (e.g. the one being torn down) may share the provider
-        if (boundCases.isNotEmpty()) p.unbind(*boundCases.toTypedArray())
+        // only one of our camera views may own the camera: release whichever view had it (e.g. the document scanner) first
+        owner?.takeIf { it !== this }?.releaseState()
+        p.unbindAll()
+        owner = this
         boundCases = emptyList()
         liveness?.close(); liveness = null; imageCapture = null
         val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
@@ -149,8 +153,11 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
         val camera = p.bindToLifecycle(activity, selector, *cases.toTypedArray())
         boundCases = cases
         // surface camera problems to JS instead of failing silently
-        camera.cameraInfo.cameraState.observe(activity) { st -> if (boundActive) st.error?.let { error("camera_error_${it.code}") } }
-        postDelayed({ if (boundActive && frames.get() == 0) error("camera_no_frames") }, 6000)
+        camera.cameraInfo.cameraState.observe(activity) { st ->
+          lastState = st.type.name
+          if (boundActive) st.error?.let { error("camera_error_${it.code}_${st.type.name}") }
+        }
+        postDelayed({ if (boundActive && frames.get() == 0) error("camera_no_frames_$lastState") }, 6000)
       } catch (e: Exception) {
         boundActive = false
         error(e.message)
@@ -163,9 +170,19 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
     boundMode = null
     liveness?.close(); liveness = null
     imageCapture = null
-    val c = boundCases
     boundCases = emptyList()
-    if (c.isNotEmpty()) runCatching { provider?.unbind(*c.toTypedArray()) }
+    if (owner === this) { owner = null; runCatching { provider?.unbindAll() } }
+  }
+
+  /** Forget everything bound by this view (the provider itself is unbound by whoever takes over). */
+  private fun releaseState() {
+    boundActive = false; boundMode = null
+    liveness?.close(); liveness = null
+    imageCapture = null; boundCases = emptyList()
+  }
+
+  companion object {
+    @Volatile private var owner: CaptureCameraView? = null
   }
 
   fun shutdown() {
