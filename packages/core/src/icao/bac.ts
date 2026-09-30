@@ -52,12 +52,12 @@ export function tlv(tag: number, value: Uint8Array): Uint8Array {
   const len = l < 128 ? [l] : l < 256 ? [0x81, l] : [0x82, l >> 8, l & 0xff];
   return concat(Uint8Array.of(tag, ...len), value);
 }
-function readTlv(b: Uint8Array, o: number): { tag: number; value: Uint8Array; end: number } {
+function readTlv(b: Uint8Array, o: number): { tag: number; value: Uint8Array; end: number; tagEnd: number } {
   const tag = b[o++];
   let len = b[o++];
   if (len === 0x81) len = b[o++];
   else if (len === 0x82) { len = (b[o] << 8) | b[o + 1]; o += 2; }
-  return { tag, value: b.subarray(o, o + len), end: o + len };
+  return { tag, value: b.subarray(o, o + len), end: o + len, tagEnd: o };
 }
 
 export class SecureMessaging {
@@ -180,9 +180,11 @@ export async function readPassport(tx: Transceive, mrz: { documentNumber: string
 
 /** Pull the "MRZ" text out of DG1 (tag 61 -> 5F1F) */
 export function dg1ToMrzLines(dg1: Uint8Array): string[] {
-  const outer = readTlv(dg1, 0);
-  const inner = readTlv(outer.value, 0);
-  const text = String.fromCharCode(...inner.value);
+  const outer = readTlv(dg1, 0);                       // 61 { 5F1F <mrz> }
+  if (outer.tag !== 0x61 || outer.value[0] !== 0x5f || outer.value[1] !== 0x1f) throw new Error('not a DG1 file');
+  let o = 2, len = outer.value[o++];                   // BER length of the 5F1F value
+  if (len === 0x81) len = outer.value[o++];
+  const text = String.fromCharCode(...outer.value.subarray(o, o + len));
   const size = text.length === 90 ? 30 : text.length === 72 ? 36 : 44;
   const lines: string[] = [];
   for (let i = 0; i < text.length; i += size) lines.push(text.slice(i, i + size));

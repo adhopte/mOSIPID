@@ -38,7 +38,7 @@ export interface IssuerMetadata {
   x_branding_url?: string;
   x_branding_tenant?: string;
   credential_configurations_supported: Record<string, {
-    format: string; scope?: string; doctype?: string; vct?: string;
+    format: string; scope?: string; doctype?: string; vct?: string; x_branding_tenant?: string;
     display?: { name: string; locale?: string; background_color?: string; text_color?: string }[];
     cryptographic_binding_methods_supported?: string[];
   }>;
@@ -154,7 +154,7 @@ export function toStoredCredential(o: { issued: IssuedCredential; configId: stri
     id: randomId(9), format: mdoc ? FORMAT_MDOC : FORMAT_SDJWT, configId: o.configId,
     docType: mdoc ? mdocDocType(b64u.decode(o.issued.credential)) : undefined, vct: cfg.vct,
     raw: o.issued.credential, devicePrivateKeyHex: toHex(o.key.privateKey), devicePublicJwk: o.key.publicJwk,
-    issuer: o.meta.credential_issuer, issuerName: o.meta.display?.[0]?.name, brandingTenant: o.meta.x_branding_tenant,
+    issuer: o.meta.credential_issuer, issuerName: o.meta.display?.[0]?.name, brandingTenant: cfg.x_branding_tenant ?? o.meta.x_branding_tenant,
     title: disp?.name ?? o.configId, addedAt: new Date().toISOString(), expiresAt,
   };
 }

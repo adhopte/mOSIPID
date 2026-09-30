@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brand & Asset Portal</title>
+<link rel="stylesheet" href="/shared/base.css">
+<style>
+  .layout { display: grid; gap: 20px; grid-template-columns: 260px 1fr; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  .tenants button { display: block; width: 100%; text-align: left; background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; color: var(--text); font: inherit; cursor: pointer; }
+  .tenants button[aria-current="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+  .colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .preview { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .preview .bar { padding: 12px 16px; display: flex; gap: 12px; align-items: center; color: #fff; font-weight: 700; }
+  .preview .bar img { height: 32px; max-width: 120px; object-fit: contain; background: rgba(255,255,255,.9); border-radius: 6px; padding: 2px; }
+  .preview .body { padding: 16px; }
+  .preview .body .b { display: inline-block; padding: 8px 14px; border-radius: 9px; color: #fff; font-weight: 600; }
+  .logo-thumb { max-height: 60px; max-width: 180px; background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 50%/16px 16px; border-radius: 8px; padding: 4px; }
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <img class="logo" alt=""><span class="brand" data-i18n="admin.title">Brand & Asset Portal</span>
+  <span data-lang-switcher></span>
+  <button class="ghost hidden" id="logout" data-i18n="admin.logout">Sign out</button>
+</div></header>
+<main>
+  <section id="login" class="card hidden" style="max-width:420px;margin:40px auto">
+    <h1 data-i18n="admin.login">Administrator sign-in</h1>
+    <form id="loginForm">
+      <label for="u" data-i18n="admin.username">Username</label><input id="u" autocomplete="username" required>
+      <label for="p" data-i18n="admin.password">Password</label><input id="p" type="password" autocomplete="current-password" required>
+      <div id="loginErr" class="msg err hidden"></div>
+      <p><button class="btn" data-i18n="admin.signin">Sign in</button></p>
+    </form>
+  </section>
+
+  <section id="editor" class="hidden">
+    <h1 data-i18n="admin.heading">Central branding</h1>
+    <p class="lead" data-i18n="admin.lead">Change the logo, colours, theme and organisation names used by the wallet, issuers and verifiers. Changes appear everywhere within about a minute.</p>
+    <div class="layout">
+      <aside class="card tenants"><h3 data-i18n="admin.tenants">Applications</h3><div id="tenantList"></div>
+        <hr style="border:0;border-top:1px solid var(--border)"><h3 data-i18n="admin.newTenant">New tenant</h3>
+        <input id="newId" placeholder="e.g. verifier-bank" pattern="[a-z0-9-]{2,40}"><p><button class="btn secondary" id="addTenant" data-i18n="admin.add">Add</button></p>
+      </aside>
+      <div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between"><h2 id="tName" style="margin:0"></h2><span class="pill" id="tKind"></span></div>
+          <h3 data-i18n="admin.names">Organisation name (per language)</h3>
+          <div class="grid" id="names"></div>
+          <h3 data-i18n="admin.logo">Logo</h3>
+          <div class="row"><img id="logoThumb" class="logo-thumb hidden" alt=""><input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="max-width:320px"><button class="btn secondary" id="logoClear" data-i18n="admin.removeLogo">Remove logo</button></div>
+          <p class="muted" data-i18n="admin.logoHint">PNG, JPEG, WebP or SVG up to 300 KB. A transparent PNG or SVG works best.</p>
+          <h3 data-i18n="admin.colors">Colours</h3>
+          <div class="colors" id="colors"></div>
+          <h3 data-i18n="admin.theme">Theme</h3>
+          <select id="theme" style="max-width:260px"><option value="light" data-i18n="admin.themeLight">Light</option><option value="dark" data-i18n="admin.themeDark">Dark</option><option value="auto" data-i18n="admin.themeAuto">Follow device</option></select>
+          <h3 data-i18n="admin.preview">Preview</h3>
+          <div class="preview" id="preview"><div class="bar"><img id="pvLogo" class="hidden" alt=""><span id="pvName"></span></div><div class="body"><p>Lorem ipsum dolor sit amet.</p><span class="b" id="pvBtn">Button</span> <span class="b" id="pvAcc">Accent</span></div></div>
+          <div id="saveMsg" class="msg hidden"></div>
+          <p class="row"><button class="btn" id="save" data-i18n="admin.save">Save changes</button><button class="btn secondary" id="reset" data-i18n="admin.reset">Reset to defaults</button></p>
+        </div>
+        <div class="card" style="margin-top:16px"><h3 data-i18n="admin.usage">How apps use this</h3>
+          <p class="muted"><code id="apiUrl"></code></p></div>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="/config.js"></script>
+<script src="/shared/app.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>

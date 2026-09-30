@@ -18,3 +18,4 @@ export * from './wallet/oid4vci';
 export * from './wallet/oid4vp';
 export * from './icao/bac';
 export * from './icao/des';
+export * from './pki';

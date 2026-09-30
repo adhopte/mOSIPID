@@ -1,0 +1,15 @@
+{
+  "name": "@mosipid/issuer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:pg --external:express --external:qrcode --external:sharp --external:tesseract.js",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "gen:iaca": "tsx src/gen-iaca.ts"
+  },
+  "dependencies": { "@mosipid/core": "*", "@mosipid/server-kit": "*", "tesseract.js": "^5.1.1" },
+  "optionalDependencies": { "sharp": "^0.33.5" }
+}
