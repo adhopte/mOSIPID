@@ -1,6 +1,6 @@
 import { p256 } from '@noble/curves/p256';
 import { sha256 } from '@noble/hashes/sha2';
-import { b64u, utf8, concat } from './bytes';
+import { b64u, utf8, concat, fromUtf8 } from './bytes';
 
 export interface Jwk { kty: 'EC'; crv: 'P-256'; x: string; y: string; d?: string; kid?: string; alg?: string; use?: string }
 export interface KeyPair { privateKey: Uint8Array; publicJwk: Jwk }
@@ -46,7 +46,7 @@ export interface ParsedJwt { header: any; payload: any; signingInput: string; si
 export function parseJwt(jwt: string): ParsedJwt {
   const parts = jwt.split('.');
   if (parts.length !== 3) throw new Error('malformed JWT');
-  const dec = (s: string) => JSON.parse(new TextDecoder().decode(b64u.decode(s)));
+  const dec = (s: string) => JSON.parse(fromUtf8(b64u.decode(s)));
   return { header: dec(parts[0]), payload: dec(parts[1]), signingInput: `${parts[0]}.${parts[1]}`, signature: b64u.decode(parts[2]) };
 }
 export function verifyJwtWithJwk(jwt: string, jwk: Jwk): ParsedJwt {

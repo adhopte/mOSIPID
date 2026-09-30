@@ -176,3 +176,38 @@ export async function receivePreAuthorized(o: { offer: CredentialOffer; txCode?:
   }
   return out;
 }
+
+/**
+ * High level: authorization-code flow with PKCE. `authorize` opens the authorization URL in a system
+ * browser (e.g. expo-web-browser's openAuthSessionAsync) and resolves with the final redirect URL.
+ */
+export async function receiveWithAuthorizationCode(o: {
+  offer: CredentialOffer; clientId: string; redirectUri: string; language?: string; f?: FetchLike;
+  authorize: (authorizationUrl: string) => Promise<string>;
+}): Promise<StoredCredential[]> {
+  const f = o.f ?? defaultFetch;
+  const meta = await fetchIssuerMetadata(o.offer.credential_issuer, f);
+  const as = await fetchAuthServerMetadata(meta.authorization_servers?.[0] ?? meta.credential_issuer, f);
+  if (!as.authorization_endpoint) throw new ProtocolError('authorization endpoint missing', 'unsupported_grant');
+  const scopes = o.offer.credential_configuration_ids.map((id) => meta.credential_configurations_supported[id]?.scope).filter(Boolean).join(' ');
+  const pkce = createPkce();
+  const state = randomId(12);
+  const url = buildAuthorizationUrl({
+    endpoint: as.authorization_endpoint, clientId: o.clientId, redirectUri: o.redirectUri, scope: scopes, state, challenge: pkce.challenge,
+    issuerState: o.offer.grants?.authorization_code?.issuer_state, issuer: meta.credential_issuer, language: o.language,
+  });
+  const back = parseQuery(await o.authorize(url));
+  if (back.error) throw new ProtocolError(back.error_description || back.error, back.error);
+  if (back.state !== state) throw new ProtocolError('state mismatch', 'invalid_state');
+  if (!back.code) throw new ProtocolError('authorization was cancelled', 'cancelled');
+  const tok = await tokenAuthorizationCode(as.token_endpoint, { code: back.code, verifier: pkce.verifier, redirectUri: o.redirectUri, clientId: o.clientId }, f);
+  const out: StoredCredential[] = [];
+  let nonce = tok.c_nonce;
+  for (const configId of o.offer.credential_configuration_ids) {
+    const key = generateKeyPair();
+    const issued = await requestCredential({ meta, configId, accessToken: tok.access_token, cNonce: nonce, key, clientId: o.clientId, f });
+    nonce = undefined;
+    out.push(toStoredCredential({ issued, configId, meta, key }));
+  }
+  return out;
+}

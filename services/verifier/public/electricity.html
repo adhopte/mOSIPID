@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in</title><link rel="stylesheet" href="/shared/base.css"></head>
+<body>
+<header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none"></a><span data-lang-switcher></span><button class="ghost hidden" id="logout" data-i18n="v.logout">Sign out</button></div></header>
+<main>
+<section id="login">
+  <h1 data-i18n="v.electricity.title"></h1>
+  <p class="lead" data-i18n="v.electricity.lead"></p>
+  <div class="card row" style="align-items:flex-start;gap:24px">
+    <div style="flex:1;min-width:240px">
+      <button class="btn" id="go" data-i18n="v.signin">Sign in with wallet</button>
+      <div id="box" class="hidden">
+        <ol class="steps"><li data-i18n="v.step1">Open your wallet and tap “Scan”.</li><li data-i18n="v.step2">Scan this QR code, or open it in your wallet on this device.</li><li data-i18n="v.step3">Review what is shared and approve.</li></ol>
+        <p><a id="deep" class="btn secondary" data-i18n="v.openWallet">Open in wallet</a></p>
+        <p><span class="pill" id="st" data-i18n="v.waiting">Waiting for your wallet…</span></p>
+        <p class="muted" data-i18n="v.willShare">This site will ask for:</p><ul id="asks" class="muted"></ul>
+      </div>
+      <div id="err" class="msg err hidden"></div>
+    </div>
+    <div class="qrbox hidden" id="qrbox"><img id="qr" alt="QR code"></div>
+  </div>
+</section>
+<section id="account" class="hidden"></section>
+</main>
+<footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
+<script src="/config.js"></script><script src="/shared/app.js"></script><script src="/login.js"></script>
+<script>Login.start({ tenant: 'verifier-electricity', flow: 'electricity', titleKey: 'v.electricity.title', asks: ['claim.family_name','claim.given_name','claim.document_number','claim.birth_date','claim.age_over_18','claim.portrait'], render: (me, esc, t) => `<h1>${esc(t('v.welcome'))}, ${esc(me.claims.given_name)} ${esc(me.claims.family_name)}</h1><div class="grid"><div class="card"><div class="row">${me.claims.portrait ? '<img alt="" src="' + esc(me.claims.portrait) + '" style="width:96px;height:128px;object-fit:cover;border-radius:10px">' : ''}<div><p><strong>${esc(t('claim.document_number'))}</strong><br><span class=mono>${esc(me.claims.document_number)}</span></p><p><strong>${esc(t('claim.birth_date'))}</strong><br>${esc(me.claims.birth_date)}</p><p>${me.claims.age_over_18 ? '<span class="pill ok">' + esc(t('v.over18')) + '</span>' : '<span class="pill err">' + esc(t('v.under18')) + '</span>'}</p></div></div></div><div class="card"><h3>${esc(t('v.electricity.account'))}</h3><p class=muted>${esc(t('v.electricity.bill'))}</p><p style="font-size:2rem;font-weight:700">€ 84.20</p><p class=muted>${esc(t('v.issuedBy'))}: ${esc(me.issuer)}</p></div></div>` });</script>
+</body></html>

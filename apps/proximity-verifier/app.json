@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "MOSIP-ID Proximity Verifier",
+    "slug": "mosipid-proximity-verifier",
+    "scheme": "mosipidverifier",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": { "bundleIdentifier": "io.mosipid.proximityverifier", "supportsTablet": true, "infoPlist": { "NSCameraUsageDescription": "The camera scans the QR code shown by the holder's wallet." } },
+    "android": { "package": "io.mosipid.proximityverifier", "permissions": ["android.permission.CAMERA"] },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "The camera scans the QR code shown by the holder's wallet." }],
+      "expo-localization",
+      "expo-dev-client"
+    ],
+    "extra": {
+      "adminUrl": "https://mosipid-admin.onrender.com",
+      "issuerUrl": "https://mosipid-issuer.onrender.com",
+      "verifierUrl": "https://mosipid-verifier.onrender.com"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issuer</title><link rel="stylesheet" href="/shared/base.css"></head>
+<body>
+<header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none">Issuer</a><span data-lang-switcher></span></div></header>
+<main>
+<h1 data-i18n="i.id.title">Get your digital identity</h1>
+<p class="lead" data-i18n="i.id.lead">Choose how to verify your identity. You will complete the steps in your wallet app.</p>
+<div id="demo" class="msg err hidden" data-i18n="i.demoBanner"></div>
+<section id="choose" class="grid">
+  <div class="card"><h3 data-i18n="i.id.nfcTitle">Read the chip (NFC)</h3><p class="muted" data-i18n="i.id.nfcText">Hold your passport or ID card against the back of your phone. Needs the MRZ or CAN printed on the document. Highest assurance.</p><button class="btn" data-m="nfc" data-i18n="i.id.useNfc">Use NFC</button></div>
+  <div class="card"><h3 data-i18n="i.id.ocrTitle">Scan document + selfie</h3><p class="muted" data-i18n="i.id.ocrText">Point your camera at the document; it is captured automatically. Then take a live selfie to compare with the portrait.</p><button class="btn" data-m="ocr" data-i18n="i.id.useOcr">Scan document</button></div>
+</section>
+<section id="session" class="hidden">
+  <div class="card row" style="align-items:flex-start;gap:24px">
+    <div class="qrbox"><img id="qr" alt="QR code"></div>
+    <div style="flex:1;min-width:240px">
+      <h3 data-i18n="i.scan.title">Scan with your wallet</h3>
+      <ol class="steps"><li data-i18n="i.scan.s1">Open the wallet app and tap “Scan”.</li><li data-i18n="i.scan.s2">Scan this QR code (or open it on your phone).</li><li id="s3"></li><li data-i18n="i.scan.s4">Accept the credential when it is ready.</li></ol>
+      <p><a id="deep" class="btn secondary" data-i18n="i.scan.open">Open in wallet</a></p>
+      <p>Status: <span id="st" class="pill" data-i18n="i.status.created">Waiting for the wallet…</span></p>
+      <div id="err" class="msg err hidden"></div>
+      <p><button class="btn secondary" id="again" data-i18n="common.startOver">Start over</button></p>
+    </div>
+  </div>
+</section>
+</main>
+<footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
+<script src="/config.js"></script><script src="/shared/app.js"></script>
+<script>
+(async () => {
+  await App.init({ tenant: 'issuer-id', titleKey: 'i.id.title' });
+  const $ = (i) => document.getElementById(i); let stop, method;
+  if (App.config.demo && App.config.demo.face) $('demo').classList.remove('hidden');
+  const setSteps = () => { $('s3').textContent = App.t(method === 'nfc' ? 'i.scan.s3nfc' : 'i.scan.s3ocr'); };
+  document.addEventListener('langchange', setSteps);
+  document.querySelectorAll('[data-m]').forEach((b) => b.onclick = async () => {
+    method = b.dataset.m;
+    const r = await App.api('/api/enroll', { method: 'POST', body: { method } });
+    $('choose').classList.add('hidden'); $('session').classList.remove('hidden');
+    $('qr').src = App.qrUrl(r.offer_uri); $('deep').href = r.offer_uri; setSteps();
+    stop = App.poll(async () => {
+      const s = await App.api('/api/enroll/' + r.sid);
+      const st = $('st'); st.setAttribute('data-i18n', 'i.status.' + s.status); st.textContent = App.t('i.status.' + s.status);
+      st.className = 'pill' + (s.status === 'issued' || s.status === 'verified' ? ' ok' : s.status === 'failed' ? ' err' : '');
+      if (s.reason && s.status !== 'issued') { $('err').textContent = App.t('err.' + s.reason) === 'err.' + s.reason ? s.reason : App.t('err.' + s.reason); $('err').classList.remove('hidden'); } else $('err').classList.add('hidden');
+      return s.status === 'issued' || s.status === 'failed';
+    }, 2000);
+  });
+  $('again').onclick = () => { if (stop) stop(); location.reload(); };
+})();
+</script>
+</body></html>

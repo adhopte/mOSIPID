@@ -12,18 +12,16 @@ export interface Flow {
   vct?: string;
   namespace?: string;
   claims: string[];
-  /** claims shown after login */
-  purposeKey: string;
 }
 
 export const FLOWS: Record<FlowId, Flow> = {
   electricity: {
     id: 'electricity', tenant: 'verifier-electricity', format: 'mso_mdoc', anchor: 'iaca', queryId: 'identity',
-    docType: DOCTYPE_ID, namespace: NS_ID, claims: ['family_name', 'given_name', 'document_number', 'birth_date', 'age_over_18', 'portrait'], purposeKey: 'v.electricity.purpose',
+    docType: DOCTYPE_ID, namespace: NS_ID, claims: ['family_name', 'given_name', 'document_number', 'birth_date', 'age_over_18', 'portrait'],
   },
   university: {
     id: 'university', tenant: 'verifier-university', format: 'dc+sd-jwt', anchor: 'edu', queryId: 'degree',
-    vct: VCT_DEGREE, claims: ['student_id', 'given_name', 'family_name', 'degree', 'field_of_study', 'graduation_year', 'university'], purposeKey: 'v.university.purpose',
+    vct: VCT_DEGREE, claims: ['student_id', 'given_name', 'family_name', 'degree', 'field_of_study', 'graduation_year', 'university'],
   },
 };
 

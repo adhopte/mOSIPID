@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issuer</title><link rel="stylesheet" href="/shared/base.css"></head>
+<body>
+<header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none">Issuer</a><span data-lang-switcher></span></div></header>
+<main>
+<div id="demo" class="msg err hidden" data-i18n="i.demoBanner"></div>
+<h1 data-i18n="i.home.title">Get your digital credentials</h1>
+<p class="lead" data-i18n="i.home.lead">Add your identity or your university degree to your wallet. Credentials are signed by a trusted issuer and stay on your phone.</p>
+<div class="grid">
+  <a class="card" href="/id.html" style="text-decoration:none;color:inherit"><h3 data-i18n="i.home.idTitle">Digital identity</h3><p class="muted" data-i18n="i.home.idText">Read your passport or ID card with NFC, or scan it and take a selfie.</p><span class="btn" data-i18n="common.start">Start</span></a>
+  <a class="card" href="/university.html" style="text-decoration:none;color:inherit"><h3 data-i18n="i.home.uniTitle">University degree</h3><p class="muted" data-i18n="i.home.uniText">Sign in with your University ID to receive your degree attestation.</p><span class="btn" data-i18n="common.start">Start</span></a>
+</div>
+</main>
+<footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
+<script src="/config.js"></script><script src="/shared/app.js"></script>
+<script>(async()=>{await App.init({tenant:'issuer-id',titleKey:'i.home.title'});if(App.config.demo&&App.config.demo.face)document.getElementById('demo').classList.remove('hidden');})();</script>
+</body></html>

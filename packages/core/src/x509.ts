@@ -3,7 +3,7 @@
 import { p256 } from '@noble/curves/p256';
 import { p384 } from '@noble/curves/p384';
 import { sha256, sha384 } from '@noble/hashes/sha2';
-import { fromBase64, toHex } from './bytes';
+import { fromBase64, toHex, fromUtf8 } from './bytes';
 import { Asn1, parseDer, derOid, derTime } from './der';
 
 export interface Cert {
@@ -38,7 +38,7 @@ function name(n: Asn1): string {
   return n.children
     .map((rdn) => {
       const atv = rdn.children[0];
-      return `${NAMES[derOid(atv.children[0])] ?? derOid(atv.children[0])}=${new TextDecoder().decode(atv.children[1].value)}`;
+      return `${NAMES[derOid(atv.children[0])] ?? derOid(atv.children[0])}=${fromUtf8(atv.children[1].value)}`;
     })
     .join(', ');
 }

@@ -1,12 +1,12 @@
 // SD-JWT VC (IETF) issuance, presentation with KB-JWT, and verification.
 import { sha256 } from '@noble/hashes/sha2';
-import { b64u, utf8, randomBytes, toBase64 } from './bytes';
+import { b64u, utf8, randomBytes, toBase64, fromUtf8 } from './bytes';
 import { Jwk, jwkToPoint, signJwt, parseJwt, es256Verify, verifyJwtWithJwk } from './keys';
 import { Cert, parseCert, verifyChain } from './x509';
 import { Signer } from './mdoc';
 
 const enc = (o: unknown) => b64u.encode(utf8(JSON.stringify(o)));
-const dec = (s: string) => JSON.parse(new TextDecoder().decode(b64u.decode(s)));
+const dec = (s: string) => JSON.parse(fromUtf8(b64u.decode(s)));
 const digest = (s: string) => b64u.encode(sha256(utf8(s)));
 
 export interface IssueSdJwtInput {

@@ -1,0 +1,23 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mosipid/core": [
+        "../../packages/core/src"
+      ],
+      "@mosipid/mobile-kit": [
+        "../../packages/mobile-kit/src"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "index.js",
+    "../../packages/core/src/**/*.ts",
+    "../../packages/mobile-kit/src/**/*"
+  ]
+}

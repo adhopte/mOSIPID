@@ -1,6 +1,6 @@
 // OpenID for Verifiable Presentations (wallet side): request parsing (PEx + DCQL), credential
 // matching, and vp_token construction for mdoc (DeviceResponse) and SD-JWT VC (with KB-JWT).
-import { b64u } from '../bytes';
+import { b64u, fromUtf8 } from '../bytes';
 import { buildDeviceResponse, openid4vpTranscript, listIssuerSignedClaims } from '../mdoc';
 import { presentSdJwt, listSdJwtClaims } from '../sdjwt';
 import { FetchLike, defaultFetch, ProtocolError, parseQuery, formBody, StoredCredential, FORMAT_MDOC, FORMAT_SDJWT, asKeyPair } from './common';
@@ -40,7 +40,7 @@ export async function resolveAuthorizationRequest(uri: string, f: FetchLike = de
 
 function decodeRequestJwt(jwt: string) {
   const p = jwt.split('.')[1];
-  return JSON.parse(new TextDecoder().decode(b64u.decode(p)));
+  return JSON.parse(fromUtf8(b64u.decode(p)));
 }
 
 export function normalizeRequest(q: any): AuthRequest {

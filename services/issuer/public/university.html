@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issuer</title><link rel="stylesheet" href="/shared/base.css"></head>
+<body>
+<header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none">Issuer</a><span data-lang-switcher></span></div></header>
+<main>
+<h1 data-i18n="i.uni.title">University degree attestation</h1>
+<p class="lead" data-i18n="i.uni.lead">Receive your degree in your wallet. Choose the flow you prefer.</p>
+<div class="grid">
+  <section class="card">
+    <h3 data-i18n="i.uni.preTitle">A · Sign in here, scan a QR</h3>
+    <p class="muted" data-i18n="i.uni.preText">Pre-authorised code flow: sign in with your University ID and date of birth. You will get a QR code and a PIN to confirm in the wallet.</p>
+    <form id="pre">
+      <label for="sid" data-i18n="i.uni.studentId">University ID</label><input id="sid" required autocomplete="off" placeholder="BIT2020CS001">
+      <label for="dob" data-i18n="i.uni.dob">Date of birth</label><input id="dob" type="date" required>
+      <div id="perr" class="msg err hidden"></div>
+      <p><button class="btn" data-i18n="i.uni.getQr">Get QR code</button></p>
+    </form>
+    <div id="preRes" class="hidden">
+      <p><strong id="who"></strong></p>
+      <div class="qrbox"><img id="qr1" alt="QR code"></div>
+      <p><span data-i18n="i.uni.pin">PIN to enter in the wallet</span>: <span class="pill" id="pin" style="font-size:1.6rem;letter-spacing:.2em"></span></p>
+      <p><a id="deep1" class="btn secondary" data-i18n="i.scan.open">Open in wallet</a></p>
+    </div>
+  </section>
+  <section class="card">
+    <h3 data-i18n="i.uni.authTitle">B · Sign in inside the wallet</h3>
+    <p class="muted" data-i18n="i.uni.authText">Authorisation code flow: scan this QR, the wallet opens the university sign-in page and you log in with your University ID.</p>
+    <button class="btn" id="mk" data-i18n="i.uni.showQr">Show QR code</button>
+    <div id="authRes" class="hidden" style="margin-top:12px"><div class="qrbox"><img id="qr2" alt="QR code"></div><p><a id="deep2" class="btn secondary" data-i18n="i.scan.open">Open in wallet</a></p></div>
+  </section>
+</div>
+<details class="card" style="margin-top:16px"><summary data-i18n="i.uni.demoIds">Demo students</summary>
+  <table><tr><th>University ID</th><th>DOB</th><th>Degree</th></tr>
+  <tr><td class="mono">BIT2020CS001</td><td>2002-03-14</td><td>B.Tech CSE</td></tr><tr><td class="mono">BIT2019EE042</td><td>2001-11-02</td><td>B.Tech EE</td></tr>
+  <tr><td class="mono">BIT2021ME015</td><td>2003-07-21</td><td>B.Tech ME</td></tr><tr><td class="mono">BIT2018MB007</td><td>1998-01-30</td><td>MBA</td></tr><tr><td class="mono">BIT2022DS003</td><td>2000-12-09</td><td>M.Sc DS</td></tr></table></details>
+</main>
+<footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
+<script src="/config.js"></script><script src="/shared/app.js"></script>
+<script>
+(async () => {
+  await App.init({ tenant: 'issuer-university', titleKey: 'i.uni.title' });
+  const $ = (i) => document.getElementById(i);
+  $('pre').onsubmit = async (e) => {
+    e.preventDefault(); $('perr').classList.add('hidden');
+    try {
+      const r = await App.api('/api/university/preauth', { method: 'POST', body: { studentId: $('sid').value, dob: $('dob').value } });
+      $('who').textContent = r.student.name + ' — ' + r.student.degree + ' (' + r.student.year + ')';
+      $('qr1').src = App.qrUrl(r.offer_uri); $('deep1').href = r.offer_uri; $('pin').textContent = r.tx_code; $('preRes').classList.remove('hidden');
+    } catch (err) { $('perr').textContent = App.t('err.invalid_credentials'); $('perr').classList.remove('hidden'); }
+  };
+  $('mk').onclick = async () => { const r = await App.api('/api/university/offer', { method: 'POST', body: {} }); $('qr2').src = App.qrUrl(r.offer_uri); $('deep2').href = r.offer_uri; $('authRes').classList.remove('hidden'); };
+})();
+</script>
+</body></html>

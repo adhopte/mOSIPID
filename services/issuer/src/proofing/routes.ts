@@ -64,7 +64,8 @@ export function proofingRouter(store: Store, cfg: IssuerConfig): Router {
     let img: Uint8Array;
     try { img = decodeB64Image(req.body?.image); } catch (e) { throw bad(e); }
     const m = await readMrzFromImage(cfg, img, req.body?.debug_mrz);
-    res.json({ found: !!m, valid: !!m?.checksOk, format: m?.format });
+    // the MRZ belongs to the person holding the phone; returning it lets the wallet pre-fill the NFC (BAC) form
+    res.json({ found: !!m, valid: !!m?.checksOk, format: m?.format, ...(m?.checksOk ? { mrz: { documentNumber: m.documentNumber, birthDate: m.birthDate, expiryDate: m.expiryDate } } : {}) });
   }));
 
   r.post('/api/proofing/:sid/ocr', rateLimit(20, 60_000), wrap(async (req, res) => {

@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@mosipid/core": [
+        "../../packages/core/src"
+      ],
+      "@mosipid/mobile-kit": [
+        "../../packages/mobile-kit/src"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "react-native": [
+        "./node_modules/react-native"
+      ],
+      "expo-constants": [
+        "./node_modules/expo-constants"
+      ],
+      "expo-localization": [
+        "./node_modules/expo-localization"
+      ],
+      "@react-native-async-storage/async-storage": [
+        "./node_modules/@react-native-async-storage/async-storage"
+      ],
+      "qrcode-generator": [
+        "./node_modules/qrcode-generator"
+      ]
+    }
+  }
+}
