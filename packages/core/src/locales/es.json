@@ -488,6 +488,7 @@
  "w.home.proximity": "Compartir en persona (proximidad)",
  "w.home.scan": "Escanear código QR",
  "w.live.blink": "Parpadee lentamente",
+ "w.live.cameraError": "No se pudo iniciar la cámara. Cierre otras apps que la usen e inténtelo de nuevo.",
  "w.live.center": "Mire de frente a la cámara",
  "w.live.done": "Listo – enviando…",
  "w.live.hint.closer": "Acérquese más",

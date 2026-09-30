@@ -26,6 +26,7 @@ class LivenessAnalyzer(
   private val context: Context,
   private val onUi: (JSONObject) -> Unit,
   private val onComplete: (JSONObject) -> Unit,
+  private val onFrame: () -> Unit = {},
 ) : ImageAnalysis.Analyzer {
 
   private enum class Step { CENTER, BLINK, TURN, TURN_OTHER, DONE }
@@ -55,6 +56,7 @@ class LivenessAnalyzer(
 
   @androidx.annotation.OptIn(ExperimentalGetImage::class)
   override fun analyze(proxy: ImageProxy) {
+    onFrame()
     val media = proxy.image
     if (finished || media == null) { proxy.close(); return }
     val input = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)

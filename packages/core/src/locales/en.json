@@ -488,6 +488,7 @@
  "w.home.proximity": "Share in person (proximity)",
  "w.home.scan": "Scan QR code",
  "w.live.blink": "Blink slowly",
+ "w.live.cameraError": "The camera could not start. Close other apps using the camera, then try again.",
  "w.live.center": "Look straight at the camera",
  "w.live.done": "Done – sending…",
  "w.live.hint.closer": "Move closer",

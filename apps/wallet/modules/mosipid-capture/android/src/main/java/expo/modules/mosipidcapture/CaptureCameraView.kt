@@ -61,6 +61,7 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var provider: ProcessCameraProvider? = null
   private var imageCapture: ImageCapture? = null
   private var boundCases: List<UseCase> = emptyList()
+  private val frames = java.util.concurrent.atomic.AtomicInteger(0)
   private var liveness: LivenessAnalyzer? = null
   private val analysisExecutor = Executors.newSingleThreadExecutor()
   private val ioExecutor = Executors.newSingleThreadExecutor()
@@ -73,8 +74,21 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
 
   init { addView(previewView) }
 
+  // React Native only gives this view a size; the PreviewView inside must be measured AND laid out with exactly that size,
+  // otherwise its TextureView stays 0x0, never produces a surface and the camera session (incl. analysis) never starts.
+  override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+    measureChild(previewView, widthMeasureSpec, heightMeasureSpec)
+    setMeasuredDimension(
+      android.view.ViewGroup.resolveSize(previewView.measuredWidth, widthMeasureSpec),
+      android.view.ViewGroup.resolveSize(previewView.measuredHeight, heightMeasureSpec),
+    )
+  }
+
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-    previewView.layout(0, 0, right - left, bottom - top)
+    val w = right - left
+    val h = bottom - top
+    previewView.measure(android.view.View.MeasureSpec.makeMeasureSpec(w, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(h, android.view.View.MeasureSpec.EXACTLY))
+    previewView.layout(0, 0, w, h)
   }
 
   fun applyProps() {
@@ -103,14 +117,16 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
         boundCases = emptyList()
         liveness?.close(); liveness = null; imageCapture = null
         val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-        val analysis = ImageAnalysis.Builder()
-          .setResolutionSelector(
+        val analysisBuilder = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+        if (mode != "liveness") {
+          analysisBuilder.setResolutionSelector(
             ResolutionSelector.Builder()
               .setResolutionStrategy(ResolutionStrategy(Size(1280, 720), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
               .build()
           )
-          .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-          .build()
+        }
+        val analysis = analysisBuilder.build()
+        frames.set(0)
         val cases = mutableListOf<UseCase>(preview, analysis)
         val selector: CameraSelector
         if (mode == "liveness") {
@@ -119,6 +135,7 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
             context,
             onUi = { onLiveness(JsonEvent(it.toString())) },
             onComplete = { onLivenessComplete(JsonEvent(it.toString())) },
+            onFrame = { frames.incrementAndGet() },
           )
           liveness = a
           analysis.setAnalyzer(analysisExecutor, a)
@@ -129,8 +146,11 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
           imageCapture = cap
           cases.add(cap)
         }
-        p.bindToLifecycle(activity, selector, *cases.toTypedArray())
+        val camera = p.bindToLifecycle(activity, selector, *cases.toTypedArray())
         boundCases = cases
+        // surface camera problems to JS instead of failing silently
+        camera.cameraInfo.cameraState.observe(activity) { st -> if (boundActive) st.error?.let { error("camera_error_${it.code}") } }
+        postDelayed({ if (boundActive && frames.get() == 0) error("camera_no_frames") }, 6000)
       } catch (e: Exception) {
         boundActive = false
         error(e.message)
@@ -161,6 +181,7 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
 
     @androidx.annotation.OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
+      frames.incrementAndGet()
       val media = image.image
       val now = System.currentTimeMillis()
       if (media == null || now - lastRun < 250 || !busy.compareAndSet(false, true)) { image.close(); return }

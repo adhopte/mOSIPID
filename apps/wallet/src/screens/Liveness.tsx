@@ -41,7 +41,7 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
     <View style={{ gap: 12 }}>
       <View style={{ height: 440, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
         <CaptureCameraView key={attempt} style={{ flex: 1 }} mode="liveness" active={started} onLiveness={setUi} onLivenessComplete={complete}
-          onCaptureError={(m) => { setError(m); setStarted(false); }} />
+          onCaptureError={(m) => { setError(/^camera_/.test(m) ? `${t('w.live.cameraError')} (${m})` : m); setStarted(false); }} />
         <View pointerEvents="none" style={{ position: 'absolute', left: '14%', right: '14%', top: '9%', bottom: '15%', borderWidth: 4, borderRadius: 999, borderColor: started && ui?.faceOk ? theme.ok : theme.accent }} />
         {started ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 6, backgroundColor: '#fff3' }}>
