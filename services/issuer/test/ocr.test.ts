@@ -1,9 +1,11 @@
 // Opt-in integration test for the real Tesseract MRZ pipeline (downloads eng.traineddata on first run):
 //   RUN_OCR=1 npm test -w @mosipid/issuer
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../src/config';
-import { readMrzFromImage } from '../src/proofing/ocr';
+import { readMrzFromImage, closeOcr } from '../src/proofing/ocr';
+
+after(() => closeOcr());
 
 test('Tesseract reads a rendered TD3 passport MRZ', { skip: !process.env.RUN_OCR, timeout: 180_000 }, async () => {
   const sharp = (await import('sharp')).default;

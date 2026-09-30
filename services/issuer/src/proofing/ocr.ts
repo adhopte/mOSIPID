@@ -16,6 +16,9 @@ async function worker() {
   return workerP;
 }
 
+/** Stops the OCR worker (used by tests and graceful shutdown). */
+export async function closeOcr() { if (workerP) { const w = await workerP; workerP = undefined; await w.terminate(); } }
+
 let queue: Promise<unknown> = Promise.resolve();
 /** Runs OCR jobs strictly one at a time so concurrent uploads cannot multiply memory use. */
 const serial = <T,>(fn: () => Promise<T>): Promise<T> => { const r = queue.then(fn, fn); queue = r.catch(() => {}); return r; };
