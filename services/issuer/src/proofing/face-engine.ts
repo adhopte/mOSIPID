@@ -118,16 +118,27 @@ export class FaceEngine {
     return r;
   }
 
-  /** Decode to RGB and scale like the reference: max side 640, min side ≥ 320. */
-  private async decode(bytes: Uint8Array): Promise<Rgb & { scale: number; origW: number; origH: number }> {
+  /** Decode (EXIF-upright, optional extra 90° rotation) to a raw RGB buffer. */
+  private async decodeRaw(bytes: Uint8Array, rot = 0): Promise<{ data: Buffer; width: number; height: number; channels: number }> {
     const base = this.sharp(Buffer.from(bytes), { failOn: 'none' }).rotate().flatten({ background: '#ffffff' }).toColourspace('srgb');
-    const meta = await base.clone().raw().toBuffer({ resolveWithObject: true });
-    const { width: w, height: h } = meta.info;
-    const scale = Math.max(w, h) > 640 ? 640 / Math.max(w, h) : Math.min(w, h) < 320 ? 320 / Math.min(w, h) : 1;
-    if (scale === 1) return { data: new Uint8Array(meta.data), width: w, height: h, scale, origW: w, origH: h };
-    const tw = Math.round(w * scale), th = Math.round(h * scale);
-    const r = await this.sharp(meta.data, { raw: { width: w, height: h, channels: meta.info.channels } }).resize(tw, th, { kernel: scale < 1 ? 'lanczos3' : 'cubic' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    return { data: new Uint8Array(r.data), width: tw, height: th, scale, origW: w, origH: h };
+    let m = await base.raw().toBuffer({ resolveWithObject: true });
+    if (rot) m = await this.sharp(m.data, { raw: { width: m.info.width, height: m.info.height, channels: m.info.channels } }).rotate(rot).raw().toBuffer({ resolveWithObject: true });
+    return { data: m.data, width: m.info.width, height: m.info.height, channels: m.info.channels };
+  }
+
+  /** Scale like the reference (max side 640, min side ≥ 320) – optionally only a region of the decoded image. */
+  private async prepare(raw: { data: Buffer; width: number; height: number; channels: number }, region?: { left: number; top: number; width: number; height: number }): Promise<Rgb & { scale: number; origW: number; origH: number; offX: number; offY: number }> {
+    const { width: w, height: h, channels } = raw;
+    const rw = region?.width ?? w, rh = region?.height ?? h;
+    const scale = Math.max(rw, rh) > 640 ? 640 / Math.max(rw, rh) : Math.min(rw, rh) < 320 ? 320 / Math.min(rw, rh) : 1;
+    const offX = region?.left ?? 0, offY = region?.top ?? 0;
+    if (scale === 1 && !region) return { data: new Uint8Array(raw.data), width: w, height: h, scale, origW: w, origH: h, offX, offY };
+    let img = this.sharp(raw.data, { raw: { width: w, height: h, channels } });
+    if (region) img = img.extract(region);
+    const tw = Math.round(rw * scale), th = Math.round(rh * scale);
+    if (scale !== 1) img = img.resize(tw, th, { kernel: scale < 1 ? 'lanczos3' : 'cubic' });
+    const r = await img.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    return { data: new Uint8Array(r.data), width: r.info.width, height: r.info.height, scale, origW: w, origH: h, offX, offY };
   }
 
   private async detect(img: Rgb): Promise<DetectedFace[]> {
@@ -168,32 +179,56 @@ export class FaceEngine {
     return Float32Array.from(out.fc1.data as Float32Array);
   }
 
-  /** Largest face of an image: embedding, head-turn estimate and its box in *original* pixel coordinates. */
+  /**
+   * Largest face of an image: embedding, head-turn estimate and its box in *decoded (upright)* pixel coordinates.
+   * For a document scan, a face that is too small at 640 px (a passport page on an A4 scan) is searched for in overlapping
+   * tiles, and then in the image rotated by 90/270/180°.
+   */
   analyse(bytes: Uint8Array, what: 'document' | 'chip' | 'selfie' | 'turn_left' | 'turn_right'): Promise<
-    { ok: true; embedding: Float32Array; yaw: number; faces: number; box: { x: number; y: number; w: number; h: number }; width: number; height: number } | { ok: false; reason: string }
+    { ok: true; embedding: Float32Array; yaw: number; faces: number; box: { x: number; y: number; w: number; h: number }; width: number; height: number; rot: number } | { ok: false; reason: string }
   > {
     return this.run(async () => {
-      let img;
-      try { img = await this.decode(bytes); } catch { return { ok: false as const, reason: `${what}_image_invalid` }; }
-      const faces = await this.detect(img);
-      if (!faces.length) return { ok: false as const, reason: `${what}_no_face` };
-      if (what !== 'document' && what !== 'chip' && faces.length > 1 && faces[1].width > 0.5 * faces[0].width) return { ok: false as const, reason: `${what}_multiple_faces` };
-      const f = faces[0];
-      const s = 1 / img.scale;
-      return {
-        ok: true as const, embedding: await this.embed(img, f), yaw: f.yaw, faces: faces.length,
-        box: { x: f.box[0] * s, y: f.box[1] * s, w: f.box[2] * s, h: f.box[3] * s }, width: img.origW, height: img.origH,
-      };
+      const rots = what === 'document' ? [0, 90, 270, 180] : [0];
+      for (const rot of rots) {
+        let raw;
+        try { raw = await this.decodeRaw(bytes, rot); } catch { return { ok: false as const, reason: `${what}_image_invalid` }; }
+        const regions: (undefined | { left: number; top: number; width: number; height: number })[] = [undefined];
+        if (what === 'document') {
+          for (const frac of [0.55, 0.36]) {           // overlapping windows covering the page
+            const tw = Math.round(raw.width * frac), th = Math.round(raw.height * frac);
+            const nx = Math.ceil((1 - frac) / (frac / 2)) + 1, ny = nx;
+            for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) {
+              const left = nx === 1 ? 0 : Math.round((raw.width - tw) * ix / (nx - 1)), top = ny === 1 ? 0 : Math.round((raw.height - th) * iy / (ny - 1));
+              if (tw >= 160 && th >= 160) regions.push({ left, top, width: Math.min(tw, raw.width - left), height: Math.min(th, raw.height - top) });
+            }
+          }
+        }
+        for (const region of regions) {
+          const img = await this.prepare(raw, region);
+          const faces = await this.detect(img);
+          if (!faces.length) continue;
+          if (what !== 'document' && what !== 'chip' && faces.length > 1 && faces[1].width > 0.5 * faces[0].width) return { ok: false as const, reason: `${what}_multiple_faces` };
+          const f = faces[0];
+          const s = 1 / img.scale;
+          return {
+            ok: true as const, embedding: await this.embed(img, f), yaw: f.yaw, faces: faces.length, rot,
+            box: { x: f.box[0] * s + img.offX, y: f.box[1] * s + img.offY, w: f.box[2] * s, h: f.box[3] * s }, width: raw.width, height: raw.height,
+          };
+        }
+      }
+      return { ok: false as const, reason: `${what}_no_face` };
     });
   }
 
   /** Portrait crop (with ICAO-style margin) of the face found by `analyse`, as a bounded JPEG. */
-  async cropPortrait(bytes: Uint8Array, box: { x: number; y: number; w: number; h: number }, imgW: number, imgH: number): Promise<Uint8Array | null> {
+  async cropPortrait(bytes: Uint8Array, box: { x: number; y: number; w: number; h: number }, imgW: number, imgH: number, rot = 0): Promise<Uint8Array | null> {
     try {
       const mx = box.w * 0.55, top = box.h * 0.65, bottom = box.h * 0.55;
       const left = Math.max(0, Math.round(box.x - mx)), t = Math.max(0, Math.round(box.y - top));
       const width = Math.min(imgW - left, Math.round(box.w + 2 * mx)), height = Math.min(imgH - t, Math.round(box.h + top + bottom));
-      return await this.sharp(Buffer.from(bytes)).rotate().extract({ left, top: t, width, height }).resize({ width: 240, height: 320, fit: 'cover' }).jpeg({ quality: 72 }).toBuffer();
+      let src = this.sharp(Buffer.from(bytes)).rotate();
+      if (rot) src = this.sharp(await src.toBuffer()).rotate(rot);
+      return await src.extract({ left, top: t, width, height }).resize({ width: 240, height: 320, fit: 'cover' }).jpeg({ quality: 72 }).toBuffer();
     } catch { return null; }
   }
 }

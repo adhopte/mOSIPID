@@ -64,6 +64,26 @@ object ImageTools {
     return Uri.fromFile(f).toString()
   }
 
+  fun rotatedJpeg(context: Context, uri: String, degrees: Int, maxSide: Int): String {
+    var bmp = decodeUpright(readBytes(context, uri), maxOf(maxSide, 1024))
+    if (degrees % 360 != 0) bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, Matrix().apply { postRotate(degrees.toFloat()) }, true)
+    return saveJpeg(context, scaled(bmp, maxSide), 88)
+  }
+
+  /** Crop a fractional rectangle and scale it so that its long side is [maxSide] (up-scaling is allowed – small MRZ text OCRs better bigger). */
+  fun crop(context: Context, uri: String, x: Double, y: Double, w: Double, h: Double, maxSide: Int): Map<String, Any> {
+    val bmp = decodeUpright(readBytes(context, uri), 6000)
+    val cx = (bmp.width * x).toInt().coerceIn(0, bmp.width - 1)
+    val cy = (bmp.height * y).toInt().coerceIn(0, bmp.height - 1)
+    val cw = (bmp.width * w).toInt().coerceIn(1, bmp.width - cx)
+    val ch = (bmp.height * h).toInt().coerceIn(1, bmp.height - cy)
+    var part = Bitmap.createBitmap(bmp, cx, cy, cw, ch)
+    val scale = maxSide.toFloat() / maxOf(part.width, part.height)
+    if (scale > 1f) part = Bitmap.createScaledBitmap(part, (part.width * scale).toInt(), (part.height * scale).toInt(), true)
+    else part = scaled(part, maxSide)
+    return mapOf("uri" to saveJpeg(context, part, 92), "width" to part.width, "height" to part.height)
+  }
+
   fun scaled(bmp: Bitmap, maxSide: Int): Bitmap {
     val scale = maxSide.toFloat() / maxOf(bmp.width, bmp.height)
     return if (scale < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp

@@ -56,7 +56,7 @@ export async function compareFaces(cfg: IssuerConfig, input: FaceInput): Promise
   const sel = await eng.analyse(input.selfie, 'selfie');
   if (!sel.ok) return { match: false, score: 0, demo: false, provider, failure: sel.reason };
   const score = cosine(src.embedding, sel.embedding);
-  const portrait = (await eng.cropPortrait(input.source, src.box, src.width, src.height)) ?? undefined;
+  const portrait = (await eng.cropPortrait(input.source, src.box, src.width, src.height, src.rot)) ?? undefined;
   const base = { score, demo: false, provider, portrait } as const;
   if (score < MATCH_THRESHOLD) return { ...base, match: false, failure: 'face_mismatch' };
 

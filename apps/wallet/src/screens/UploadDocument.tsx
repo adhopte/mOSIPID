@@ -3,7 +3,7 @@ import { Image, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { MrzData, mrzFromPages } from '@mosipid/core';
 import { useI18n, Button, Card, ErrorBox, H, P } from '@mosipid/mobile-kit';
-import { captureAvailable, normalizeImage, recognizeText, renderPdf } from '../../modules/mosipid-capture';
+import { captureAvailable, cropImage, normalizeImage, recognizeText, renderPdf, rotateImage } from '../../modules/mosipid-capture';
 
 /** A document ready to send: upright JPEG page(s) on disk + the phone's OCR text and the MRZ parsed from it. */
 export interface CapturedDocument { uris: string[]; ocrText: string; source: 'camera' | 'upload'; mrz: MrzData }
@@ -23,26 +23,58 @@ const asBase64 = async (uri: string): Promise<string> => {
 
 export interface PickedPages { uris: string[]; texts: string[]; pdf: boolean }
 
-/** Pick an image or PDF and return its page(s) (PDF: up to `maxPages`) with on-device OCR text. Native module required. */
-export async function pickPages(kind: 'image' | 'pdf', maxPages = 2): Promise<PickedPages | null> {
+const hasMrz = (texts: string[]) => !!mrzFromPages(texts.filter(Boolean))?.checksOk;
+
+/**
+ * OCR one page, and if no valid machine-readable zone shows up, look harder: the page rotated by 90/270/180° and – for full-page
+ * scans where the passport only fills part of an A4 sheet – overlapping horizontal bands re-read at higher effective resolution.
+ * Returns the (possibly rotated) page image and all text that was read.
+ */
+export async function readPageDeep(uri: string, firstText: string): Promise<{ uri: string; text: string; found: boolean }> {
+  if (hasMrz([firstText])) return { uri, text: firstText, found: true };
+  for (const rot of [0, 90, 270, 180]) {
+    const base = rot ? await rotateImage(uri, rot) : uri;
+    const full = rot ? (await recognizeText(base)).text : firstText;
+    if (hasMrz([full])) return { uri: base, text: full, found: true };
+    const texts = [full];
+    for (const y of [0, 0.22, 0.44, 0.66]) {
+      const band = await cropImage(base, 0, y, 1, 0.34, 2600);
+      texts.push((await recognizeText(band.uri)).text);
+      if (hasMrz(texts)) return { uri: base, text: texts.join('\n'), found: true };
+    }
+  }
+  return { uri, text: firstText, found: false };
+}
+
+/**
+ * Pick an image or PDF and return its page(s) with on-device OCR text. Native module required.
+ * `seek`: 'all' = every page must be searched for the MRZ (passport data page / ID back); 'last' = only the last page of a
+ * multi-page file (ID front + back in one PDF); 'none' = plain OCR.
+ */
+export async function pickPages(kind: 'image' | 'pdf', maxPages = 2, seek: 'all' | 'last' | 'none' = 'none'): Promise<PickedPages | null> {
   const r = await DocumentPicker.getDocumentAsync({ type: kind === 'pdf' ? ['application/pdf'] : ['image/*'], copyToCacheDirectory: true, multiple: false });
   if (r.canceled || !r.assets?.[0]) return null;
   const f = r.assets[0];
   const isPdf = kind === 'pdf' || f.mimeType === 'application/pdf' || /\.pdf$/i.test(f.name ?? '');
   const pages = isPdf ? await renderPdf(f.uri, maxPages) : [await normalizeImage(f.uri, 2400)];
-  const texts: string[] = [];
-  for (const p of pages) texts.push((await recognizeText(p.uri)).text);
-  return { uris: pages.map((p) => p.uri), texts, pdf: isPdf };
+  const uris: string[] = [], texts: string[] = [];
+  for (let i = 0; i < pages.length; i++) {
+    let uri = pages[i].uri, text = (await recognizeText(uri)).text;
+    const deep = (seek === 'all' && !hasMrz(texts)) || (seek === 'last' && pages.length > 1 && i === pages.length - 1);
+    if (deep && !hasMrz([text])) { const d = await readPageDeep(uri, text); uri = d.uri; text = d.text; }
+    uris.push(uri); texts.push(text);
+  }
+  return { uris, texts, pdf: isPdf };
 }
 
 /** Upload image / Upload PDF buttons that hand back the picked pages (no review UI, no MRZ requirement). */
-export function UploadButtons({ onPages, disabled, maxPages = 2 }: { onPages: (p: PickedPages) => void; disabled?: boolean; maxPages?: number }) {
+export function UploadButtons({ onPages, disabled, maxPages = 2, seek = 'none' }: { onPages: (p: PickedPages) => void; disabled?: boolean; maxPages?: number; seek?: 'all' | 'last' | 'none' }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState<'image' | 'pdf' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pick = async (kind: 'image' | 'pdf') => {
     setError(null); setBusy(kind);
-    try { const p = await pickPages(kind, maxPages); if (p) onPages(p); }
+    try { const p = await pickPages(kind, maxPages, seek); if (p) onPages(p); }
     catch (e: any) { setError(`${t('w.cap.fileError')} (${e?.message ?? ''})`); }
     finally { setBusy(null); }
   };
@@ -65,12 +97,12 @@ export async function pickDocument(kind: 'image' | 'pdf'): Promise<PickedDocumen
     if (isPdf) throw Object.assign(new Error('pdf_unsupported'), { code: 'pdf_unsupported' });
     return { fallbackImage: await asBase64(f.uri), uri: f.uri };
   }
-  const pages = isPdf ? await renderPdf(f.uri, 2) : [await normalizeImage(f.uri, 2400)];
-  const texts: string[] = [];
-  for (const p of pages) texts.push((await recognizeText(p.uri)).text);
+  const raw = isPdf ? await renderPdf(f.uri, 2) : [await normalizeImage(f.uri, 2400)];
+  const uris: string[] = [], texts: string[] = [];
+  for (const p of raw) { const d = await readPageDeep(p.uri, (await recognizeText(p.uri)).text); uris.push(d.uri); texts.push(d.text); }
   const mrz = mrzFromPages(texts);
   if (!mrz?.checksOk) throw Object.assign(new Error('no_mrz'), { code: 'no_mrz' });
-  return { uris: pages.map((p) => p.uri), ocrText: texts.join('\n'), source: 'upload', mrz };
+  return { uris, ocrText: texts.join('\n'), source: 'upload', mrz };
 }
 
 /**

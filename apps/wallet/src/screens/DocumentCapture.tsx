@@ -165,7 +165,7 @@ export function DocumentCapture({ onDone, onCancel, fixedKind }: { onDone: (d: P
       <ErrorBox message={error} />
       {captureAvailable ? <Button kind={seeking ? 'secondary' : 'primary'} label={seeking ? t('w.cap.now') : t('w.cap.shoot')} onPress={manualCapture} /> : null}
       <P muted style={{ textAlign: 'center' }}>{t('w.cap.orUpload')}</P>
-      <UploadButtons onPages={uploaded} maxPages={step === 'front' || step === 'data' ? 2 : 1} />
+      <UploadButtons onPages={uploaded} maxPages={step === 'front' || step === 'data' ? 2 : 1} seek={step === 'data' || step === 'back' ? 'all' : step === 'front' ? 'last' : 'none'} />
       {kind === 'id_card' && step === 'front' ? <P muted style={{ textAlign: 'center' }}>{t('w.cap.cardPdfHint')}</P> : null}
       <Pressable onPress={() => { if (adding) setAdding(false); else if (pages.length) { setPages((p) => p.slice(0, -1)); setCombined(false); } else if (!fixedKind) setKind(null); else onCancel(); }} accessibilityRole="button" style={{ padding: 12 }}>
         <Text style={{ color: theme.muted, textAlign: 'center' }}>{adding || pages.length || !fixedKind ? t('w.cap.backStep') : t('w.cancel')}</Text>

@@ -46,3 +46,9 @@ export function CaptureCameraView(p: Props) {
     onCaptureError: onCaptureError && ((e: any) => onCaptureError(parse<{ message: string }>(e).message)),
   });
 }
+
+export interface FaceInfo { faces: number; rotation: number; frameWidth: number; boxWidth: number; yaw: number; roll: number; left: number; right: number }
+export const analyseFace = (uri: string, rotation = 0): Promise<FaceInfo> => Native.analyseFace(uri, rotation);
+export const frameToJpeg = (uri: string, rotation: number, maxSide = 720): Promise<string> => Native.frameToJpeg(uri, rotation, maxSide);
+export const rotateImage = (uri: string, degrees: number): Promise<string> => Native.rotateImage(uri, degrees);
+export const cropImage = (uri: string, x: number, y: number, w: number, h: number, maxSide = 2400): Promise<ImageRef> => Native.cropImage(uri, x, y, w, h, maxSide);

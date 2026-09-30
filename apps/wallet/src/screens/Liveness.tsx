@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useI18n, useBrand, Button, Card, ErrorBox, P } from '@mosipid/mobile-kit';
 import { CaptureCameraView, LivenessResult, LivenessUi, captureAvailable, readBase64 } from '../../modules/mosipid-capture';
 import { SelfieCapture } from './Capture';
+import { PollLiveness } from './PollLiveness';
 
 /** What the issuer needs: base64 JPEGs of the frontal selfie and the two head-turn frames, plus the device report. */
 export interface SelfieResult { selfie: string; turnLeft?: string; turnRight?: string; report: Record<string, unknown> }
@@ -22,9 +24,19 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
   const [error, setError] = useState<string | null>(null);
   const [perm, requestPerm] = useCameraPermissions();
   const [simple, setSimple] = useState(false);
+  const [poll, setPoll] = useState(false);
+  React.useEffect(() => { AsyncStorage.getItem('liveness.poll.v1').then((v) => { if (v === '1') setPoll(true); }).catch(() => {}); }, []);
 
   React.useEffect(() => { if (perm && !perm.granted && perm.canAskAgain) requestPerm(); }, [perm?.granted]);
 
+  const complete0 = (r: SelfieResult) => onDone(r);
+  if (captureAvailable && poll && !simple) {
+    return (
+      <View style={{ gap: 12 }}>
+        <PollLiveness onDone={complete0} onFail={(m) => { setError(`${t('w.live.cameraError')} (${m})`); setPoll(false); }} />
+      </View>
+    );
+  }
   if (!captureAvailable || simple) {
     return <SelfieCapture onDone={(r) => onDone({ selfie: r.selfie, turnLeft: r.frames[1], turnRight: r.frames[2], report: { method: 'timed_frames' } })} />;
   }
@@ -42,7 +54,7 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
     <View style={{ gap: 12 }}>
       <View style={{ height: 440, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
         <CaptureCameraView key={attempt} style={{ flex: 1 }} mode="liveness" active={started} onLiveness={setUi} onLivenessComplete={complete}
-          onCaptureError={(m) => { setError(/^camera_/.test(m) ? `${t('w.live.cameraError')} (${m})` : m); setStarted(false); }} />
+          onCaptureError={(m) => { if (/^camera_/.test(m)) { setStarted(false); setPoll(true); AsyncStorage.setItem('liveness.poll.v1', '1').catch(() => {}); } else { setError(m); setStarted(false); } }} />
         <View pointerEvents="none" style={{ position: 'absolute', left: '14%', right: '14%', top: '9%', bottom: '15%', borderWidth: 4, borderRadius: 999, borderColor: started && ui?.faceOk ? theme.ok : theme.accent }} />
         {started ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 6, backgroundColor: '#fff3' }}>
