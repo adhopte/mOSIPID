@@ -4,7 +4,7 @@ import { LANGUAGES } from '@mosipid/core';
 import { isLockEnabled, setLockEnabled, authenticate } from '../lock';
 import { useI18n, useServers, useBrand, Button, Card, Field, H, P, Screen } from '@mosipid/mobile-kit';
 
-export function SettingsScreen({ onClose }: { onClose: () => void }) {
+export function SettingsScreen({ onClose, onTutorial }: { onClose: () => void; onTutorial?: () => void }) {
   const { t, lang, setLang } = useI18n();
   const s = useServers();
   const { theme, name } = useBrand();
@@ -20,6 +20,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           {LANGUAGES.map((l) => <Button key={l.code} kind={lang === l.code ? 'primary' : 'secondary'} label={l.label} onPress={() => setLang(l.code)} />)}
         </View>
       </Card>
+      {onTutorial ? <Button kind="secondary" label={t('w.tut.replay')} onPress={onTutorial} /> : null}
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flex: 1 }}><H>{t('w.settings.appLock')}</H><P muted>{t('w.settings.appLockHint')}</P></View>

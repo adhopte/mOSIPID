@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, View, Text } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { DOCTYPE_ID, NS_ID, LANGUAGES, ReaderProximity, RequestedItems, VerifiedDocument, toBase64 } from '@mosipid/core';
+import { DOCTYPE_ID, NS_ID, VCT_DEGREE, LANGUAGES, ReaderProximity, RequestedItems, VerifiedDocument, toBase64 } from '@mosipid/core';
 import { useI18n, useServers, useBrand, Button, Card, ErrorBox, Field, H, P, Screen } from '@mosipid/mobile-kit';
+import { Cert, parseCert } from '@mosipid/core';
 import { cachedTrust, identityAnchors, syncTrust } from './trust';
 
-export type Profile = 'age' | 'identity' | 'full';
+export type Profile = 'age' | 'identity' | 'full' | 'degree';
 const PROFILES: Record<Profile, string[]> = {
   age: ['age_over_18'],
   identity: ['family_name', 'given_name', 'birth_date', 'portrait', 'age_over_18'],
+  degree: [],
   full: ['family_name', 'given_name', 'birth_date', 'sex', 'nationality', 'document_number', 'expiry_date', 'issuing_authority', 'portrait', 'age_over_18', 'assurance_level'],
 };
 export const wanted = (p: Profile): RequestedItems => ({ [DOCTYPE_ID]: { [NS_ID]: PROFILES[p] } });
@@ -30,6 +32,7 @@ export function HomeScreen({ onStart, onSettings }: { onStart: (p: Profile) => v
         <Button label={t('p.profile.age')} onPress={() => onStart('age')} disabled={!info} />
         <Button kind="secondary" label={t('p.profile.identity')} onPress={() => onStart('identity')} disabled={!info} />
         <Button kind="secondary" label={t('p.profile.full')} onPress={() => onStart('full')} disabled={!info} />
+        <Button kind="secondary" label={t('p.profile.degree')} onPress={() => onStart('degree')} disabled={!info} />
       </Card>
       <Card>
         <H>{t('p.trust.title')}</H>
@@ -47,6 +50,7 @@ export function VerifyScreen({ profile, onClose }: { profile: Profile; onClose: 
   const handled = useRef(false);
   const [state, setState] = useState<'scan' | 'wait' | 'ok' | 'fail'>('scan');
   const [docs, setDocs] = useState<VerifiedDocument[]>([]);
+  const [degree, setDegree] = useState<{ claims: Record<string, unknown>; anchor: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const onQr = async (data: string) => {
@@ -56,6 +60,12 @@ export function VerifyScreen({ profile, onClose }: { profile: Profile; onClose: 
     try {
       const trust = await cachedTrust();
       if (!trust) throw new Error(t('p.trust.none'));
+      if (profile === 'degree') {
+        const edu = trust.anchors.filter((a) => a.use === 'sd-jwt-education').map((a) => parseCert(a.pem));
+        const res = await ReaderProximity.requestSdJwt(data, { vct: VCT_DEGREE, claims: ['student_id', 'given_name', 'family_name', 'degree', 'field_of_study', 'graduation_year', 'university'] }, { trustAnchors: edu, timeoutMs: 120_000 });
+        if (res.ok) { setDegree({ claims: res.claims, anchor: res.anchorSubject }); setState('ok'); } else { setError(res.error); setState('fail'); }
+        return;
+      }
       const res = await ReaderProximity.request(data, wanted(profile), { trustAnchors: identityAnchors(trust.anchors), timeoutMs: 120_000 });
       if (res.ok) { setDocs(res.documents); setState('ok'); } else { setError(res.error); setState('fail'); }
     } catch (e: any) { setError(e.message); setState('fail'); }
@@ -72,10 +82,20 @@ export function VerifyScreen({ profile, onClose }: { profile: Profile; onClose: 
         </>
       ))}
       {state === 'wait' && <Card><ActivityIndicator /><P style={{ textAlign: 'center' }}>{t('p.waiting')}</P></Card>}
-      {state === 'ok' && <Result docs={docs} />}
+      {state === 'ok' && (degree ? <DegreeResult d={degree} /> : <Result docs={docs} />)}
       {state === 'fail' && <Card style={{ borderColor: '#B91C1C' }}><H>✗ {t('p.result.fail')}</H><ErrorBox message={error} /></Card>}
       {(state === 'ok' || state === 'fail') && <Button label={t('p.newScan')} onPress={onClose} />}
     </Screen>
+  );
+}
+
+function DegreeResult({ d }: { d: { claims: Record<string, unknown>; anchor: string } }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <Card style={{ borderColor: '#15803D' }}><H>✓ {t('p.result.ok')}</H><P muted>{t('p.result.issuer')}: {d.anchor}</P></Card>
+      <Card>{Object.entries(d.claims).filter(([k]) => !['iss', 'iat', 'nbf', 'exp', 'vct'].includes(k)).map(([k, v]) => <View key={k}><P muted>{t('claim.' + k)}</P><P>{String(v)}</P></View>)}</Card>
+    </>
   );
 }
 

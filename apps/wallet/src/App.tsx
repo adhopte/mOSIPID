@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { StoredCredential } from '@mosipid/core';
 import { loadCredentials, saveCredentials } from './vault';
@@ -12,10 +13,11 @@ import { PresentScreen } from './screens/Present';
 import { DetailScreen } from './screens/Detail';
 import { ProximityScreen } from './screens/Proximity';
 import { SettingsScreen } from './screens/Settings';
+import { Tutorial } from './screens/Tutorial';
 import { I18nProvider, useI18n, ServersProvider, useServers, BrandProvider, useBrand, Button, H, P } from '@mosipid/mobile-kit';
 
 type Route =
-  | { name: 'home' } | { name: 'scan' } | { name: 'settings' } | { name: 'proximity' }
+  | { name: 'home' } | { name: 'scan' } | { name: 'settings' } | { name: 'proximity' } | { name: 'tutorial' }
   | { name: 'offer'; uri: string } | { name: 'present'; uri: string } | { name: 'detail'; id: string };
 
 function Shell() {
@@ -30,6 +32,12 @@ function Shell() {
   const unlock = useCallback(async () => { setLocked(!(await authenticate(t('w.lock.title')))); }, [t]);
   useEffect(() => { isLockEnabled().then((on) => (on ? unlock() : setLocked(false))); }, []);
   useEffect(() => { if (locked === false) loadCredentials().then(setCreds); }, [locked]);
+  // first launch: show the animated tutorial once (replayable from Home “?” and Settings)
+  useEffect(() => {
+    if (locked !== false) return;
+    AsyncStorage.getItem('tutorial.seen.v1').then((v) => { if (!v) setRoute((r) => (r.name === 'home' ? { name: 'tutorial' } : r)); }).catch(() => {});
+  }, [locked]);
+  const closeTutorial = () => { AsyncStorage.setItem('tutorial.seen.v1', '1').catch(() => {}); setRoute({ name: 'home' }); };
 
   const route$ = useCallback((url: string | null) => {
     if (!url) return;
@@ -73,7 +81,8 @@ function Shell() {
     case 'offer': return <OfferScreen uri={route.uri} onClose={home} onIssued={(c) => persist([...creds, ...c])} />;
     case 'present': return <PresentScreen uri={route.uri} credentials={creds} onClose={home} />;
     case 'proximity': return <ProximityScreen credentials={creds} onClose={home} />;
-    case 'settings': return <SettingsScreen onClose={home} />;
+    case 'settings': return <SettingsScreen onClose={home} onTutorial={() => setRoute({ name: 'tutorial' })} />;
+    case 'tutorial': return <Tutorial onClose={closeTutorial} />;
     case 'detail': {
       const c = creds.find((x) => x.id === route.id);
       return c ? <DetailScreen credential={c} onClose={home} onDelete={async () => { await persist(creds.filter((x) => x.id !== c.id)); home(); }} /> : null;
@@ -81,7 +90,7 @@ function Shell() {
     default:
       return <HomeScreen credentials={creds} busy={busy} onOpen={(c) => setRoute({ name: 'detail', id: c.id })} onScan={() => setRoute({ name: 'scan' })}
         onGetId={(m) => startIssuerFlow('/api/enroll', { method: m })} onGetDegree={() => startIssuerFlow('/api/university/offer', {})}
-        onProximity={() => setRoute({ name: 'proximity' })} onSettings={() => setRoute({ name: 'settings' })} />;
+        onProximity={() => setRoute({ name: 'proximity' })} onSettings={() => setRoute({ name: 'settings' })} onHelp={() => setRoute({ name: 'tutorial' })} />;
   }
 }
 

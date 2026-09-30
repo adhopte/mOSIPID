@@ -7,6 +7,8 @@ import { buildDeviceEngagement, parseDeviceEngagement, SecureSession, DeviceEnga
 import { generateKeyPair, KeyPair, Jwk } from './keys';
 import { coseKeyFromJwk, jwkFromCoseKey } from './cose';
 import { buildDeviceRequest, parseDeviceRequest, buildDeviceResponse, proximityTranscript, verifyDeviceResponse, RequestedItems, VerifyResult } from './mdoc';
+import { presentSdJwt, verifySdJwtPresentation, SdJwtResult } from './sdjwt';
+import { randomId } from './bytes';
 import { Cert } from './x509';
 import { FetchLike, defaultFetch, ProtocolError, StoredCredential } from './wallet/common';
 
@@ -43,6 +45,13 @@ export const ENGAGEMENT_PREFIX = 'mdoc:';
 export const engagementToQr = (e: DeviceEngagement) => ENGAGEMENT_PREFIX + b64u.encode(e.bytes);
 export const engagementFromQr = (s: string) => parseDeviceEngagement(b64u.decode(s.replace(/^mdoc:/i, '')));
 
+/**
+ * Project extension (not in ISO 18013-5): an SD-JWT VC can be requested/presented over the same encrypted session.
+ * The DeviceRequest map carries `x_sdjwt` = {vct, claims[], nonce, aud}; the holder answers with `{x_sdjwt: <sd-jwt+kb>}`.
+ */
+export interface SdJwtRequest { vct: string; claims: string[]; nonce: string; aud: string }
+export interface ProximityRequest { mdoc: RequestedItems; sdjwt?: SdJwtRequest }
+
 // -------------------------------------------------------------- holder (wallet) side
 export class HolderProximity {
   private eDevice: KeyPair = generateKeyPair();
@@ -64,14 +73,27 @@ export class HolderProximity {
   get qr() { return engagementToQr(this.engagement); }
 
   /** Wait for the reader's encrypted DeviceRequest */
-  async waitForRequest(timeoutMs = 120_000): Promise<RequestedItems> {
+  async waitForRequest(timeoutMs = 120_000): Promise<ProximityRequest> {
     const msg = await this.transport.receive(timeoutMs);
     if (!msg) throw new ProtocolError('timed out waiting for verifier', 'timeout');
     const m = decode(msg);
     this.readerKey = jwkFromCoseKey(decode((mget(m, 'eReaderKey') as Tagged).value as Uint8Array));
     this.transcript = proximityTranscript(this.engagement.bytes, this.readerKey);
     this.session = new SecureSession(this.eDevice.privateKey, this.readerKey, this.transcript, 'device');
-    return parseDeviceRequest(this.session.decrypt(mget(m, 'data') as Uint8Array));
+    const bytes = this.session.decrypt(mget(m, 'data') as Uint8Array);
+    const x = mget<any>(decode(bytes), 'x_sdjwt');
+    return {
+      mdoc: parseDeviceRequest(bytes),
+      sdjwt: x ? { vct: mget<string>(x, 'vct')!, claims: mget<string[]>(x, 'claims') ?? [], nonce: mget<string>(x, 'nonce')!, aud: mget<string>(x, 'aud')! } : undefined,
+    };
+  }
+
+  /** Answer an `x_sdjwt` request with a key-bound SD-JWT presentation. */
+  async respondSdJwt(credential: StoredCredential, req: SdJwtRequest) {
+    if (!this.session) throw new Error('no session');
+    const { asKeyPair } = await import('./wallet/common');
+    const pres = presentSdJwt(credential.raw, req.claims, asKeyPair(credential).privateKey, req.aud, req.nonce);
+    await this.transport.send(encode(new Map<string, unknown>([['data', this.session.encrypt(encode(new Map([['x_sdjwt', pres]])))], ['status', 20]])));
   }
 
   async respond(matches: { credential: StoredCredential; requested: Record<string, string[]> }[]) {
@@ -90,22 +112,44 @@ export class HolderProximity {
 
 // -------------------------------------------------------------- reader (proximity verifier) side
 export class ReaderProximity {
-  static async request(engagementQr: string, wanted: RequestedItems, opts: { f?: FetchLike; timeoutMs?: number; trustAnchors: Cert[]; now?: Date; requireDsEku?: boolean }): Promise<VerifyResult> {
+  private static async exchange(engagementQr: string, extra: { mdoc: RequestedItems; sdjwt?: Omit<SdJwtRequest, 'nonce' | 'aud'> }, o: { f?: FetchLike; timeoutMs?: number; relayBase?: string }) {
     const eng = engagementFromQr(engagementQr);
     if (!eng.relay) throw new ProtocolError('engagement has no supported retrieval method', 'unsupported_transport');
     const eReader = generateKeyPair();
     const transcript = proximityTranscript(eng.bytes, eReader.publicJwk);
     const session = new SecureSession(eReader.privateKey, eng.eDeviceKey, transcript, 'reader');
-    const transport = new RelayTransport(eng.relay.url, eng.relay.sessionId, 'toDevice', 'toReader', opts.f);
+    const transport = new RelayTransport(o.relayBase ?? eng.relay.url, eng.relay.sessionId, 'toDevice', 'toReader', o.f);
+    const req = decode(buildDeviceRequest(extra.mdoc)) as Map<string, unknown>;
+    let sd: SdJwtRequest | undefined;
+    if (extra.sdjwt) {
+      sd = { ...extra.sdjwt, nonce: randomId(18), aud: 'proximity:' + randomId(9) };
+      req.set('x_sdjwt', new Map<string, unknown>([['vct', sd.vct], ['claims', sd.claims], ['nonce', sd.nonce], ['aud', sd.aud]]));
+    }
     await transport.send(encode(new Map<string, unknown>([
       ['eReaderKey', encodeTag24(coseKeyFromJwk(eReader.publicJwk))],
-      ['data', session.encrypt(buildDeviceRequest(wanted))],
+      ['data', session.encrypt(encode(req))],
     ])));
-    const msg = await transport.receive(opts.timeoutMs ?? 120_000);
-    if (!msg) return { ok: false, error: 'holder did not respond' };
+    const msg = await transport.receive(o.timeoutMs ?? 120_000);
+    if (!msg) return { ok: false as const, error: 'holder did not respond' };
     const data = mget<Uint8Array>(decode(msg), 'data');
-    if (!data) return { ok: false, error: 'holder declined the request' };
-    return verifyDeviceResponse(session.decrypt(data), { sessionTranscript: transcript, trustAnchors: opts.trustAnchors, now: opts.now, requireDsEku: opts.requireDsEku });
+    if (!data) return { ok: false as const, error: 'holder declined the request' };
+    return { ok: true as const, plain: session.decrypt(data), transcript, sd };
+  }
+
+  /** ISO 18013-5 mdoc request; verifies the DeviceResponse locally. */
+  static async request(engagementQr: string, wanted: RequestedItems, opts: { f?: FetchLike; timeoutMs?: number; trustAnchors: Cert[]; now?: Date; requireDsEku?: boolean; relayBase?: string }): Promise<VerifyResult> {
+    const x = await ReaderProximity.exchange(engagementQr, { mdoc: wanted }, opts);
+    if (!x.ok) return { ok: false, error: x.error };
+    return verifyDeviceResponse(x.plain, { sessionTranscript: x.transcript, trustAnchors: opts.trustAnchors, now: opts.now, requireDsEku: opts.requireDsEku });
+  }
+
+  /** Extension: request an SD-JWT VC (e.g. a degree) over the same encrypted session. */
+  static async requestSdJwt(engagementQr: string, want: { vct: string; claims: string[] }, opts: { f?: FetchLike; timeoutMs?: number; trustAnchors: Cert[]; now?: Date; relayBase?: string }): Promise<SdJwtResult> {
+    const x = await ReaderProximity.exchange(engagementQr, { mdoc: {}, sdjwt: want }, opts);
+    if (!x.ok) return { ok: false, error: x.error };
+    const pres = mget<string>(decode(x.plain), 'x_sdjwt');
+    if (!pres || !x.sd) return { ok: false, error: 'holder has no matching credential' };
+    return verifySdJwtPresentation(pres, { trustAnchors: opts.trustAnchors, aud: x.sd.aud, nonce: x.sd.nonce, now: opts.now, expectedVct: want.vct });
   }
 }
 void toBase64;

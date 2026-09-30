@@ -33,8 +33,7 @@
     "qrcode-generator": "^1.5.2",
     "react": "^19.2.3",
     "react-native": "^0.86.3",
-    "react-native-nfc-manager": "^3.17.2",
-    "react-native-svg": "^15.15.4"
+    "react-native-nfc-manager": "^3.17.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",

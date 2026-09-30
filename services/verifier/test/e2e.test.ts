@@ -7,7 +7,7 @@ import {
   resolveOffer, receivePreAuthorized, resolveAuthorizationRequest, matchCredentials, submitResponse, claimsToShare, fetchIssuerMetadata, fetchAuthServerMetadata,
   createPkce, buildAuthorizationUrl, tokenAuthorizationCode, requestCredential, toStoredCredential, generateKeyPair, parseQuery, checkDigit, derEnc, b64u, toBase64,
   createRootCa, issueDocumentSigner, receiveWithAuthorizationCode, rememberDn, HolderProximity, ReaderProximity, parseCert, oid, StoredCredential, DOCTYPE_ID, NS_ID, listIssuerSignedClaims,
-  buildDeviceResponse, openid4vpTranscript, concat, utf8,
+  buildDeviceResponse, openid4vpTranscript, concat, utf8, engagementToQr, buildDeviceEngagement,
 } from '@mosipid/core';
 import { MemoryStore, PgStore, Store } from '@mosipid/server-kit';
 import { buildApp as buildAdmin } from '../../admin/src/app';
@@ -313,8 +313,8 @@ test('proximity: holder QR → encrypted request/response over relay → reader 
   const holder = await HolderProximity.start(verifier);
   const readerP = ReaderProximity.request(holder.qr, { [DOCTYPE_ID]: { [NS_ID]: ['age_over_18', 'family_name'] } }, { trustAnchors: anchors, timeoutMs: 15_000 });
   const asked = await holder.waitForRequest(15_000);
-  assert.deepEqual(asked[DOCTYPE_ID][NS_ID], ['age_over_18', 'family_name']);
-  await holder.respond([{ credential: cred, requested: asked[DOCTYPE_ID] }]);
+  assert.deepEqual(asked.mdoc[DOCTYPE_ID][NS_ID], ['age_over_18', 'family_name']); assert.equal(asked.sdjwt, undefined);
+  await holder.respond([{ credential: cred, requested: asked.mdoc[DOCTYPE_ID] }]);
   const res = await readerP;
   assert.ok(res.ok, JSON.stringify(res));
   if (res.ok) { assert.deepEqual(res.documents[0].claims[NS_ID], { age_over_18: true, family_name: 'Muller' }); }
@@ -322,8 +322,73 @@ test('proximity: holder QR → encrypted request/response over relay → reader 
   const holder2 = await HolderProximity.start(verifier);
   const r2 = ReaderProximity.request(holder2.qr, { [DOCTYPE_ID]: { [NS_ID]: ['age_over_18'] } }, { trustAnchors: [csca.cert], timeoutMs: 15_000 });
   const asked2 = await holder2.waitForRequest(15_000);
-  await holder2.respond([{ credential: cred, requested: asked2[DOCTYPE_ID] }]);
+  await holder2.respond([{ credential: cred, requested: asked2.mdoc[DOCTYPE_ID] }]);
   assert.equal((await r2).ok, false);
+});
+
+test('proximity extension: a degree (SD-JWT VC) is presented in person, bound to the session nonce', async () => {
+  const anchors = (await (await fetch(`${verifier}/api/trust`)).json()).anchors.filter((a: any) => a.id === 'edu').map((a: any) => parseCert(a.pem));
+  const degree = wallet.find((c) => c.format === 'dc+sd-jwt')!;
+  const holder = await HolderProximity.start(verifier);
+  const readerP = ReaderProximity.requestSdJwt(holder.qr, { vct: degree.vct!, claims: ['student_id', 'degree'] }, { trustAnchors: anchors, timeoutMs: 15_000 });
+  const asked = await holder.waitForRequest(15_000);
+  assert.deepEqual(Object.keys(asked.mdoc), []); assert.deepEqual(asked.sdjwt?.claims, ['student_id', 'degree']);
+  await holder.respondSdJwt(degree, asked.sdjwt!);
+  const res = await readerP;
+  assert.ok(res.ok, JSON.stringify(res));
+  if (res.ok) { assert.equal(res.claims.degree, 'B.Tech'); assert.equal(res.claims.cgpa, undefined); assert.match(res.anchorSubject, /Education Trust/); }
+  // a reader that does not trust the education CA rejects it
+  const h2 = await HolderProximity.start(verifier);
+  const r2 = ReaderProximity.requestSdJwt(h2.qr, { vct: degree.vct!, claims: ['degree'] }, { trustAnchors: [csca.cert], timeoutMs: 15_000 });
+  const a2 = await h2.waitForRequest(15_000); await h2.respondSdJwt(degree, a2.sdjwt!);
+  assert.equal((await r2).ok, false);
+});
+
+async function pollLogin(id: string, token: string) {
+  for (let i = 0; i < 40; i++) {
+    const r = await fetch(`${verifier}/api/sessions/${id}?token=${token}`);
+    const j = await r.json();
+    if (j.status !== 'pending') return { j, cookie: r.headers.get('set-cookie')?.split(';')[0] };
+    await new Promise((x) => setTimeout(x, 250));
+  }
+  throw new Error('still pending');
+}
+
+test('website as proximity reader: browser posts the wallet QR → server runs the ISO session → login; foreign relays refused', async () => {
+  // identity (mdoc) → electricity
+  const idCred = wallet.find((c) => c.format === 'mso_mdoc')!;
+  const h1 = await HolderProximity.start(verifier);
+  const s1 = await (await post(`${verifier}/api/proximity/start`, { flow: 'electricity', engagement: h1.qr })).json();
+  const a1 = await h1.waitForRequest(15_000);
+  assert.ok(a1.mdoc[DOCTYPE_ID][NS_ID].includes('family_name'));
+  await h1.respond([{ credential: idCred, requested: a1.mdoc[DOCTYPE_ID] }]);
+  const p1 = await pollLogin(s1.id, s1.poll_token);
+  assert.equal(p1.j.status, 'verified');
+  const me = await (await fetch(`${verifier}/api/me?flow=electricity`, { headers: { cookie: p1.cookie! } })).json();
+  assert.equal(me.claims.family_name, 'Muller'); assert.match(me.claims.portrait, /^data:image\/jpeg/);
+
+  // degree (SD-JWT extension) → university
+  const degree = wallet.find((c) => c.format === 'dc+sd-jwt')!;
+  const h2 = await HolderProximity.start(verifier);
+  const s2 = await (await post(`${verifier}/api/proximity/start`, { flow: 'university', engagement: h2.qr })).json();
+  const a2 = await h2.waitForRequest(15_000);
+  assert.equal(a2.sdjwt?.vct, degree.vct);
+  await h2.respondSdJwt(degree, a2.sdjwt!);
+  const p2 = await pollLogin(s2.id, s2.poll_token);
+  assert.equal(p2.j.status, 'verified');
+  assert.equal((await (await fetch(`${verifier}/api/me?flow=university`, { headers: { cookie: p2.cookie! } })).json()).claims.degree, 'B.Tech');
+
+  // the holder declines → the website reports a rejection, not a login
+  const h3 = await HolderProximity.start(verifier);
+  const s3 = await (await post(`${verifier}/api/proximity/start`, { flow: 'electricity', engagement: h3.qr })).json();
+  await h3.waitForRequest(15_000); await h3.decline();
+  assert.equal((await pollLogin(s3.id, s3.poll_token)).j.status, 'rejected');
+
+  // SSRF guard + input validation
+  const evil = engagementToQr(buildDeviceEngagement(generateKeyPair(), { url: 'http://evil.example', sessionId: 'x' }));
+  assert.equal((await post(`${verifier}/api/proximity/start`, { flow: 'electricity', engagement: evil })).status, 400);
+  assert.equal((await post(`${verifier}/api/proximity/start`, { flow: 'electricity', engagement: 'https://example.com' })).status, 400);
+  assert.equal((await post(`${verifier}/api/proximity/start`, { flow: 'bank', engagement: h1.qr })).status, 400);
 });
 
 test('admin portal: branding is public, edits require login, validation and logo storage work', async () => {

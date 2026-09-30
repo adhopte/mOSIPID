@@ -2,15 +2,16 @@ import path from 'node:path';
 import { Router } from 'express';
 import {
   b64u, randomId, openid4vpTranscript, verifyDeviceResponse, verifySdJwtPresentation, DEFAULT_BRANDING, parseQuery,
+  ReaderProximity, engagementFromQr,
 } from '@mosipid/core';
 import { createApp, errorHandler, wrap, HttpError, rateLimit, Store, sharedWeb, parseCookies, signToken, verifyToken, secretFromEnv } from '@mosipid/server-kit';
 import { FLOWS, isFlow, dcqlFor, presentationDefinitionFor, Flow } from './flows';
 import { TrustService } from './trust';
 import { relayRouter } from './relay';
 
-export interface VerifierConfig { publicUrl: string; adminUrl?: string; issuerUrl?: string; secret: string; brandCacheMs?: number }
+export interface VerifierConfig { publicUrl: string; adminUrl?: string; issuerUrl?: string; secret: string; brandCacheMs?: number; /** how this process reaches its own relay (defaults to publicUrl) */ internalUrl?: string }
 
-interface Tx { flow: Flow['id']; nonce: string; pollToken: string; status: 'pending' | 'verified' | 'rejected'; error?: string; claims?: Record<string, unknown>; issuer?: string; consumed?: boolean; createdAt: number }
+interface Tx { mode?: 'remote' | 'proximity'; flow: Flow['id']; nonce: string; pollToken: string; status: 'pending' | 'verified' | 'rejected'; error?: string; claims?: Record<string, unknown>; issuer?: string; consumed?: boolean; createdAt: number }
 
 const TX_TTL = 600;
 
@@ -62,6 +63,51 @@ export function buildApp(store: Store, cfg: VerifierConfig, trust: TrustService)
     return name;
   }
 
+  /** Turn verified claims into what the page shows; binary portraits become data URLs. Returns an error when requested claims are missing. */
+  const finalizeClaims = (f: Flow, raw: Record<string, unknown>): { claims: Record<string, unknown> } | { error: string } => {
+    const claims = { ...raw };
+    const missing = f.claims.filter((c) => claims[c] === undefined && c !== 'portrait' && c !== 'university');
+    if (missing.length) return { error: 'required claims not disclosed: ' + missing.join(', ') };
+    for (const k of Object.keys(claims)) if (claims[k] instanceof Uint8Array) claims[k] = `data:image/jpeg;base64,${Buffer.from(claims[k] as Uint8Array).toString('base64')}`;
+    return { claims };
+  };
+
+  // ---- proximity from a website: the browser scans the wallet's QR (device engagement), this server plays the reader.
+  // The encrypted DeviceRequest/DeviceResponse travel through this server's own relay; the browser just polls as in the remote flow.
+  const sameOrigin = (a: string, b: string) => { try { return new URL(a).origin === new URL(b).origin; } catch { return false; } };
+  api.post('/proximity/start', rateLimit(30, 60_000), wrap(async (req, res) => {
+    const flowId = req.body?.flow, qr = req.body?.engagement;
+    if (!isFlow(flowId)) throw new HttpError(400, 'invalid_flow');
+    if (typeof qr !== 'string' || !/^mdoc:/i.test(qr) || qr.length > 4000) throw new HttpError(400, 'invalid_engagement', 'not a wallet QR code');
+    let relayUrl: string | undefined;
+    try { relayUrl = engagementFromQr(qr).relay?.url; } catch { throw new HttpError(400, 'invalid_engagement', 'unreadable device engagement'); }
+    // only our own relay: this endpoint must not be usable to make the server call arbitrary URLs
+    if (!relayUrl || !sameOrigin(relayUrl, cfg.publicUrl)) throw new HttpError(400, 'unsupported_relay', 'the wallet must use this verifier as its relay (check the wallet\'s verifier URL setting)');
+    const f = FLOWS[flowId];
+    const id = randomId(18);
+    const tx: Tx = { mode: 'proximity', flow: flowId, nonce: randomId(18), pollToken: randomId(18), status: 'pending', createdAt: Date.now() };
+    await store.set('vtx', id, tx, TX_TTL);
+    void (async () => {
+      const finish = (t: Tx) => store.set('vtx', id, t, TX_TTL).catch(() => {});
+      try {
+        const anchors = await trust.certs(f.anchor);
+        if (!anchors.length) return void finish({ ...tx, status: 'rejected', error: 'no trust anchors available for ' + f.anchor });
+        const relayBase = cfg.internalUrl ?? cfg.publicUrl;
+        if (f.format === 'mso_mdoc') {
+          const r = await ReaderProximity.request(qr, { [f.docType!]: { [f.namespace!]: f.claims } }, { trustAnchors: anchors, relayBase, timeoutMs: 100_000 });
+          if (!r.ok) return void finish({ ...tx, status: 'rejected', error: r.error });
+          const out = finalizeClaims(f, r.documents[0].claims[f.namespace!] ?? {});
+          return void finish('error' in out ? { ...tx, status: 'rejected', error: out.error } : { ...tx, status: 'verified', claims: out.claims, issuer: r.documents[0].anchorSubject });
+        }
+        const r = await ReaderProximity.requestSdJwt(qr, { vct: f.vct!, claims: f.claims }, { trustAnchors: anchors, relayBase, timeoutMs: 100_000 });
+        if (!r.ok) return void finish({ ...tx, status: 'rejected', error: r.error });
+        const out = finalizeClaims(f, Object.fromEntries(f.claims.filter((c) => r.claims[c] !== undefined).map((c) => [c, r.claims[c]])));
+        finish('error' in out ? { ...tx, status: 'rejected', error: out.error } : { ...tx, status: 'verified', claims: out.claims, issuer: r.anchorSubject });
+      } catch (e: any) { finish({ ...tx, status: 'rejected', error: e?.message ?? 'proximity failed' }); }
+    })();
+    res.json({ id, poll_token: tx.pollToken, expires_in: TX_TTL });
+  }));
+
   // wallet posts here (response_mode=direct_post)
   api.post('/response', rateLimit(60, 60_000), wrap(async (req, res) => {
     const state = String(req.body?.state ?? '');
@@ -94,10 +140,9 @@ export function buildApp(store: Store, cfg: VerifierConfig, trust: TrustService)
       if (!result.ok) return fail(result.error);
       claims = Object.fromEntries(f.claims.filter((c) => result.claims[c] !== undefined).map((c) => [c, result.claims[c]])); issuer = result.anchorSubject;
     }
-    const missing = f.claims.filter((c) => claims[c] === undefined && c !== 'portrait' && c !== 'university');
-    if (missing.length) return fail('required claims not disclosed: ' + missing.join(', '));
-    for (const k of Object.keys(claims)) if (claims[k] instanceof Uint8Array) claims[k] = `data:image/jpeg;base64,${Buffer.from(claims[k] as Uint8Array).toString('base64')}`;
-    await store.set('vtx', state, { ...tx, status: 'verified', claims, issuer }, TX_TTL);
+    const out = finalizeClaims(f, claims);
+    if ('error' in out) return fail(out.error);
+    await store.set('vtx', state, { ...tx, status: 'verified', claims: out.claims, issuer }, TX_TTL);
     res.json({});
   }));
 

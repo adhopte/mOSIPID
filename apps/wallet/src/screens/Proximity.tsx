@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
-import { HolderProximity, RequestedItems, StoredCredential } from '@mosipid/core';
+import { HolderProximity, ProximityRequest, StoredCredential } from '@mosipid/core';
 import { authenticate } from '../lock';
 import { useI18n, useServers, Button, Card, ErrorBox, H, P, Screen, QrCode } from '@mosipid/mobile-kit';
 
@@ -10,7 +10,7 @@ export function ProximityScreen({ credentials, onClose }: { credentials: StoredC
   const { verifierUrl } = useServers();
   const holder = useRef<HolderProximity | null>(null);
   const [qr, setQr] = useState<string | null>(null);
-  const [asked, setAsked] = useState<RequestedItems | null>(null);
+  const [asked, setAsked] = useState<ProximityRequest | null>(null);
   const [state, setState] = useState<'starting' | 'waiting' | 'asked' | 'done' | 'error'>('starting');
   const [error, setError] = useState<string | null>(null);
 
@@ -31,9 +31,19 @@ export function ProximityScreen({ credentials, onClose }: { credentials: StoredC
   const approve = async () => {
     if (!asked || !holder.current) return;
     if (!(await authenticate(t('w.present.confirmAuth')))) return;
-    const docs = Object.entries(asked).map(([docType, nss]) => ({ credential: credentials.find((c) => c.docType === docType), requested: nss }))
-      .filter((d): d is { credential: StoredCredential; requested: Record<string, string[]> } => !!d.credential);
-    try { await holder.current.respond(docs); setState('done'); } catch (e: any) { setError(e.message); setState('error'); }
+    try {
+      if (asked.sdjwt) {
+        const cred = credentials.find((c) => c.format === 'dc+sd-jwt' && c.vct === asked.sdjwt!.vct);
+        if (!cred) { setError(t('w.present.noMatch')); setState('error'); return; }
+        await holder.current.respondSdJwt(cred, asked.sdjwt);
+      } else {
+        const docs = Object.entries(asked.mdoc).map(([docType, nss]) => ({ credential: credentials.find((c) => c.docType === docType), requested: nss }))
+          .filter((d): d is { credential: StoredCredential; requested: Record<string, string[]> } => !!d.credential);
+        if (!docs.length) { setError(t('w.present.noMatch')); setState('error'); return; }
+        await holder.current.respond(docs);
+      }
+      setState('done');
+    } catch (e: any) { setError(e.message); setState('error'); }
   };
   const decline = async () => { try { await holder.current?.decline(); } catch { /* ignore */ } onClose(); };
 
@@ -44,7 +54,8 @@ export function ProximityScreen({ credentials, onClose }: { credentials: StoredC
       {state === 'asked' && asked && (
         <>
           <Card><H>{t('w.prox.request')}</H>
-            {Object.entries(asked).map(([doc, nss]) => Object.entries(nss).map(([ns, els]) => els.map((e) => <P key={doc + ns + e}>• {t('claim.' + e)}</P>)))}
+            {Object.entries(asked.mdoc).map(([doc, nss]) => Object.entries(nss).map(([ns, els]) => els.map((e) => <P key={doc + ns + e}>• {t('claim.' + e)}</P>)))}
+            {asked.sdjwt ? asked.sdjwt.claims.map((c) => <P key={c}>• {t('claim.' + c)}</P>) : null}
           </Card>
           <Button label={t('w.present.share')} onPress={approve} />
           <Button kind="secondary" label={t('w.present.decline')} onPress={decline} />
