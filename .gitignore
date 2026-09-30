@@ -6,8 +6,11 @@ dist
 .env.local
 .data
 coverage
-ios
-android
+/ios
+/android
+apps/*/ios
+apps/*/android
+!apps/*/modules/**/android
 
 # face models are downloaded at build time (services/issuer/scripts/fetch-models.js)
 services/issuer/models/*.onnx

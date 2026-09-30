@@ -21,6 +21,40 @@ const asBase64 = async (uri: string): Promise<string> => {
   });
 };
 
+export interface PickedPages { uris: string[]; texts: string[]; pdf: boolean }
+
+/** Pick an image or PDF and return its page(s) (PDF: up to `maxPages`) with on-device OCR text. Native module required. */
+export async function pickPages(kind: 'image' | 'pdf', maxPages = 2): Promise<PickedPages | null> {
+  const r = await DocumentPicker.getDocumentAsync({ type: kind === 'pdf' ? ['application/pdf'] : ['image/*'], copyToCacheDirectory: true, multiple: false });
+  if (r.canceled || !r.assets?.[0]) return null;
+  const f = r.assets[0];
+  const isPdf = kind === 'pdf' || f.mimeType === 'application/pdf' || /\.pdf$/i.test(f.name ?? '');
+  const pages = isPdf ? await renderPdf(f.uri, maxPages) : [await normalizeImage(f.uri, 2400)];
+  const texts: string[] = [];
+  for (const p of pages) texts.push((await recognizeText(p.uri)).text);
+  return { uris: pages.map((p) => p.uri), texts, pdf: isPdf };
+}
+
+/** Upload image / Upload PDF buttons that hand back the picked pages (no review UI, no MRZ requirement). */
+export function UploadButtons({ onPages, disabled, maxPages = 2 }: { onPages: (p: PickedPages) => void; disabled?: boolean; maxPages?: number }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState<'image' | 'pdf' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pick = async (kind: 'image' | 'pdf') => {
+    setError(null); setBusy(kind);
+    try { const p = await pickPages(kind, maxPages); if (p) onPages(p); }
+    catch (e: any) { setError(`${t('w.cap.fileError')} (${e?.message ?? ''})`); }
+    finally { setBusy(null); }
+  };
+  return (
+    <View style={{ gap: 10 }}>
+      <Button kind="secondary" label={busy === 'image' ? t('w.cap.uploading') : t('w.cap.uploadImage')} onPress={() => pick('image')} busy={busy === 'image'} disabled={disabled || !!busy} />
+      <Button kind="secondary" label={busy === 'pdf' ? t('w.cap.uploading') : t('w.cap.uploadPdf')} onPress={() => pick('pdf')} busy={busy === 'pdf'} disabled={disabled || !!busy} />
+      <ErrorBox message={error} />
+    </View>
+  );
+}
+
 /** Pick an image (gallery / files) or a PDF; with the native module it is normalised, OCR-ed on-device and must hold a valid MRZ. */
 export async function pickDocument(kind: 'image' | 'pdf'): Promise<PickedDocument | null> {
   const r = await DocumentPicker.getDocumentAsync({ type: kind === 'pdf' ? ['application/pdf'] : ['image/*'], copyToCacheDirectory: true, multiple: false });

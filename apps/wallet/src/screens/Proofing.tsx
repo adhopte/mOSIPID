@@ -10,7 +10,13 @@ import { captureAvailable, readBase64 } from '../../modules/mosipid-capture';
 import { nfcAvailable, openNfcSettings, readChipWithMrz } from '../nfc/reader';
 
 async function post(api: string, path: string, body: unknown) {
-  const r = await fetch(api + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  // never hang forever (a sleeping free-tier server or a stalled upload): give up after 2 minutes with a clear message
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 120_000);
+  let r: Response;
+  try { r = await fetch(api + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal }); }
+  catch (e: any) { const x: any = new Error('timeout'); x.code = e?.name === 'AbortError' ? 'timeout' : 'network'; throw x; }
+  finally { clearTimeout(timer); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { const e: any = new Error(j.error || 'request_failed'); e.code = j.error; e.left = j.attempts_left; throw e; }
   return j;
@@ -113,7 +119,7 @@ export function NfcProofing({ sid, api, onVerified, onCancel }: { sid: string; a
   if (scanning) return (
     <Screen title={t('w.nfc.scanMrz')} onBack={() => setScanning(false)}>
       {captureAvailable
-        ? <DocumentCapture onCancel={() => setScanning(false)} onDone={(d) => { if ('mrz' in d) { setDocNo(d.mrz.documentNumber); setDob(d.mrz.birthDate); setExp(d.mrz.expiryDate); } setScanning(false); }} />
+        ? <DocumentCapture fixedKind="passport" onCancel={() => setScanning(false)} onDone={(d) => { if ('mrz' in d) { setDocNo(d.mrz.documentNumber); setDob(d.mrz.birthDate); setExp(d.mrz.expiryDate); } setScanning(false); }} />
         : <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })}
             onCaptured={(_img, m) => { if (m) { setDocNo(m.documentNumber); setDob(m.birthDate); setExp(m.expiryDate); } setScanning(false); }} />}
     </Screen>
