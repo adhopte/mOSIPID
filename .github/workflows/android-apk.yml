@@ -35,8 +35,15 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - name: Accept Android SDK licences (SDK is preinstalled on the runner)
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-      - name: Pre-install CMake (parallel Gradle tasks otherwise race to install it and fail)
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1" > /dev/null'
+      - name: Pre-install CMake + NDK (parallel Gradle tasks race to install them; downloads are retried because they occasionally arrive corrupted)
+        run: |
+          for pkg in "cmake;3.22.1" "ndk;27.1.12297006"; do
+            for attempt in 1 2 3 4; do
+              "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$pkg" > /dev/null && break
+              echo "retry $pkg ($attempt)"; rm -rf "$ANDROID_HOME/ndk/27.1.12297006"; sleep 5
+            done
+          done
+          test -d "$ANDROID_HOME/ndk/27.1.12297006" && test -d "$ANDROID_HOME/cmake/3.22.1"
       - name: Install shared packages (repo root)
         run: npm ci
         env: { ONNXRUNTIME_NODE_INSTALL_CUDA: skip }
