@@ -32,6 +32,16 @@ An end-to-end, **Inji-style** digital-credential stack you can run locally and d
 > Metro/Hermes but have not been run on a phone** in this environment, so camera, NFC and biometric flows are untested on hardware.
 > See [What is real and what is mocked](docs/ARCHITECTURE.md#what-is-real-and-what-is-mocked) before relying on anything.
 
+## What the Blue Tiger edition adds
+
+* **Domains** – Render services are named `bluetiger-inji-admin`, `bluetiger-inji-issuer`, `bluetiger-inji-verifier` (`https://bluetiger-inji-<x>.onrender.com`); the Blue Tiger logo is the default app icon, splash and admin-portal logo (replaceable in the portal).
+* **Document capture** – the wallet has a native (Kotlin/ML Kit + CameraX) auto-capture: it reads the MRZ live, waits for three consistent frames, then submits. Users can instead **upload an image or PDF** (first page rendered on device). Falls back to `expo-camera` where the native module is unavailable.
+* **Face match** – the issuer runs OpenCV Model Zoo **YuNet + SFace** through `onnxruntime-node` (cosine ≥ 0.363); the wallet's on-device liveness (blink / turn head) is re-checked server-side by comparing the captured poses. Models are downloaded at build time by `services/issuer/scripts/fetch-models.js`. Env: `FACE_PROVIDER=auto|opencv|mock`, `FACE_REQUIRE_LIVENESS`.
+* **Manual PID + pre-authorised code** – `/manual.html` on the issuer lets an operator type PID details and get a QR + PIN (`ALLOW_MANUAL_PID=false` disables it).
+* **Animated tutorial** in the wallet (Home → help, Settings → Tutorial).
+* **Verifier sites** – realistic electricity and university sites with dashboards. Sign-in offers **Online** (QR or "open in wallet" deeplink, OID4VP) or **In person** (the site's camera scans the wallet's `mdoc:` device-engagement QR and runs the encrypted ISO 18013-5 exchange through the relay; SD-JWT degrees use a project extension `x_sdjwt`).
+* **Known limits** – CAN/PACE chip access and BLE transport are not implemented (BAC with MRZ and relay transport are); liveness is not a certified PAD; requests are unsigned (`redirect_uri` client scheme). The native capture module is compiled only by the APK workflow – test on a device.
+
 ## Quick start (local)
 
 ```bash
