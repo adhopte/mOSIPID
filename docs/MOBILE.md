@@ -49,3 +49,12 @@ Deep links registered: `openid-credential-offer://`, `openid4vp://`, `haip://`, 
 ## Proximity Verifier – what to try
 Choose a check (age over 18 / name+portrait / full details) → scan the wallet's QR → the result shows *valid/invalid*, the trusted issuer and the disclosed fields.
 Trust anchors are synced from the verifier backend and **cached**, so verification itself does not need connectivity (the relay transport still does — see ARCHITECTURE).
+
+## Getting installable APKs without an Android toolchain (GitHub Actions)
+`.github/workflows/android-apk.yml` builds **both** release APKs on GitHub's runners (which ship the Android SDK) and attaches them to a GitHub Release:
+
+* push a tag: `git tag apk-v0.1.0 && git push origin apk-v0.1.0`, **or**
+* Actions → *Build Android APKs* → *Run workflow* (you can override the three server URLs; otherwise repo variables `ADMIN_URL`/`ISSUER_URL`/`VERIFIER_URL`, then the Render defaults, are baked in).
+
+Download `mosipid-wallet.apk` / `mosipid-proximity-verifier.apk` from the run's *Releases* page and sideload (allow "install unknown apps"). They are signed with the Expo **debug** key – fine for testing, not for the Play Store.
+The server URLs can still be changed at runtime in **Settings → Servers**.
