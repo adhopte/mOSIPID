@@ -20,7 +20,7 @@ export function buildApp(cfg: AdminConfig) {
   const requireAdmin = (req: Request, _res: Response, next: NextFunction) => {
     if (!isAdmin(req)) return next(new HttpError(401, 'unauthorized', 'admin login required'));
     // state-changing calls must be JSON (blocks cross-site form posts)
-    if (req.method !== 'GET' && !req.is('application/json')) return next(new HttpError(415, 'unsupported_media_type'));
+    if (req.method !== 'GET' && !(req.headers['content-type'] ?? '').startsWith('application/json')) return next(new HttpError(415, 'unsupported_media_type'));
     next();
   };
 

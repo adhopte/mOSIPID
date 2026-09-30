@@ -30,3 +30,13 @@ test('PgStore satisfies the store contract', { skip: !process.env.TEST_DATABASE_
   const s = new PgStore(process.env.TEST_DATABASE_URL!, (pg as any).default ?? pg);
   try { await contract('postgres', s); } finally { await s.close(); }
 });
+
+test('several PgStore instances starting at once do not race on table creation', { skip: !process.env.TEST_DATABASE_URL }, async () => {
+  const pg: any = await import('pg');
+  const url = process.env.TEST_DATABASE_URL!;
+  const boot = new PgStore(url, pg.default ?? pg);
+  await boot.get('x', 'y'); await (boot as any).pool.query('DROP TABLE kv'); await boot.close();
+  const stores = Array.from({ length: 4 }, () => new PgStore(url, pg.default ?? pg));
+  try { await Promise.all(stores.map((s, i) => s.set('race', 'k' + i, i))); assert.equal((await stores[0].list('race')).length, 4); }
+  finally { await Promise.all(stores.map((s) => s.close())); }
+});

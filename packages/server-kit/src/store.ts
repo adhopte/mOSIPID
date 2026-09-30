@@ -36,7 +36,17 @@ export class PgStore implements Store {
     // Render's *external* URLs (…render.com) and sslmode=require need TLS; the internal URL does not.
     const ssl = /render\.com|sslmode=require/.test(url) ? { rejectUnauthorized: false } : undefined;
     this.pool = new pg.Pool({ connectionString: url, ssl, max: 5 });
-    this.ready = this.pool.query(`CREATE TABLE IF NOT EXISTS kv (ns text NOT NULL, key text NOT NULL, value jsonb NOT NULL, expires_at timestamptz, PRIMARY KEY (ns, key))`).then(() => undefined);
+    this.pool.on('error', (e: Error) => console.error('[store] idle client error:', e.message)); // don't crash on dropped connections
+    // Several services share one database and start together: CREATE TABLE IF NOT EXISTS can lose a race, so retry.
+    this.ready = (async () => {
+      for (let i = 0; ; i++) {
+        try {
+          await this.pool.query(`CREATE TABLE IF NOT EXISTS kv (ns text NOT NULL, key text NOT NULL, value jsonb NOT NULL, expires_at timestamptz, PRIMARY KEY (ns, key))`);
+          return;
+        } catch (e) { if (i >= 6) throw e; await new Promise((r) => setTimeout(r, 300 * (i + 1))); }
+      }
+    })();
+    this.ready.catch((e) => console.error('[store] could not initialise database:', e.message));
     setInterval(() => this.pool.query('DELETE FROM kv WHERE expires_at IS NOT NULL AND expires_at < now()').catch(() => {}), 60_000).unref();
   }
   async get(ns: string, key: string) {

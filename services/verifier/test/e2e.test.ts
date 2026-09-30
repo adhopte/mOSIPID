@@ -316,4 +316,10 @@ test('admin portal: branding is public, edits require login, validation and logo
   const { req } = await remoteLogin('electricity', []);
   assert.equal(req.verifierName, 'Lumière Power');
   assert.match(await (await fetch(`${admin}/api/branding/verifier-electricity/theme.css`)).text(), /#112233/);
+  // reset (bodiless DELETE) needs the admin session + JSON header, and restores defaults incl. removing the logo
+  assert.equal((await fetch(`${admin}/api/branding/verifier-electricity`, { method: 'DELETE', headers: { 'content-type': 'application/json' } })).status, 401);
+  assert.equal((await fetch(`${admin}/api/branding/verifier-electricity`, { method: 'DELETE', headers: { 'content-type': 'text/plain', cookie } })).status, 415);
+  assert.equal((await fetch(`${admin}/api/branding/verifier-electricity`, { method: 'DELETE', headers: { 'content-type': 'application/json', cookie } })).status, 200);
+  const reset = await (await fetch(`${admin}/api/branding/verifier-electricity`)).json();
+  assert.equal(reset.names.en, 'VoltEdge Electricity'); assert.equal(reset.logoUrl, undefined);
 });
