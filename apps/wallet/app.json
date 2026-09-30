@@ -1,8 +1,13 @@
 {
   "expo": {
-    "name": "MOSIP-ID Wallet",
+    "name": "Blue Tiger Wallet",
     "slug": "mosipid-wallet",
-    "scheme": ["mosipidwallet", "openid-credential-offer", "openid4vp", "haip"],
+    "scheme": [
+      "mosipidwallet",
+      "openid-credential-offer",
+      "openid4vp",
+      "haip"
+    ],
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,29 +19,96 @@
         "NSCameraUsageDescription": "The camera is used to scan QR codes, capture your identity document and take a selfie.",
         "NSFaceIDUsageDescription": "Face ID unlocks your wallet and approves sharing.",
         "NFCReaderUsageDescription": "NFC is used to read the chip of your passport or ID card.",
-        "com.apple.developer.nfc.readersession.iso7816.select-identifiers": ["A0000002471001", "A0000002472001", "00000000000000"]
+        "com.apple.developer.nfc.readersession.iso7816.select-identifiers": [
+          "A0000002471001",
+          "A0000002472001",
+          "00000000000000"
+        ]
       },
-      "entitlements": { "com.apple.developer.nfc.readersession.formats": ["TAG"] }
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": [
+          "TAG"
+        ]
+      }
     },
     "android": {
       "package": "io.mosipid.wallet",
-      "permissions": ["android.permission.CAMERA", "android.permission.NFC", "android.permission.USE_BIOMETRIC"],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.NFC",
+        "android.permission.USE_BIOMETRIC"
+      ],
       "intentFilters": [
-        { "action": "VIEW", "category": ["BROWSABLE", "DEFAULT"], "data": [{ "scheme": "openid-credential-offer" }, { "scheme": "openid4vp" }, { "scheme": "haip" }] }
-      ]
+        {
+          "action": "VIEW",
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "openid-credential-offer"
+            },
+            {
+              "scheme": "openid4vp"
+            },
+            {
+              "scheme": "haip"
+            }
+          ]
+        }
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A1230"
+      },
+      "predictiveBackGestureEnabled": false
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A1230"
+        }
+      ],
       "expo-secure-store",
-      ["expo-camera", { "cameraPermission": "The camera is used to scan QR codes, capture your identity document and take a selfie." }],
-      ["expo-local-authentication", { "faceIDPermission": "Face ID unlocks your wallet and approves sharing." }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "The camera is used to scan QR codes, capture your identity document and take a selfie."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Face ID unlocks your wallet and approves sharing."
+        }
+      ],
       "expo-localization",
-      ["react-native-nfc-manager", { "nfcPermission": "NFC is used to read the chip of your passport or ID card.", "selectIdentifiers": ["A0000002471001"], "includeNdefEntitlement": false }],
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "NFC is used to read the chip of your passport or ID card.",
+          "selectIdentifiers": [
+            "A0000002471001"
+          ],
+          "includeNdefEntitlement": false
+        }
+      ],
       "expo-dev-client"
     ],
     "extra": {
-      "adminUrl": "https://mosipid-admin.onrender.com",
-      "issuerUrl": "https://mosipid-issuer.onrender.com",
-      "verifierUrl": "https://mosipid-verifier.onrender.com"
+      "adminUrl": "https://bluetiger-inji-admin.onrender.com",
+      "issuerUrl": "https://bluetiger-inji-issuer.onrender.com",
+      "verifierUrl": "https://bluetiger-inji-verifier.onrender.com"
+    },
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#0A1230",
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

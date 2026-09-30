@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Issuer</title><link rel="stylesheet" href="/shared/base.css"></head>
+<title>Issuer</title><link rel="stylesheet" href="/shared/base.css"><link rel="icon" href="/shared/brand/favicon.png"></head>
 <body>
 <header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none">Issuer</a><span data-lang-switcher></span></div></header>
 <main>
@@ -10,6 +10,7 @@
 <div id="demo" class="msg err hidden" data-i18n="i.demoBanner"></div>
 <section id="choose" class="grid">
   <div class="card"><h3 data-i18n="i.id.nfcTitle">Read the chip (NFC)</h3><p class="muted" data-i18n="i.id.nfcText">Hold your passport or ID card against the back of your phone. Needs the MRZ or CAN printed on the document. Highest assurance.</p><button class="btn" data-m="nfc" data-i18n="i.id.useNfc">Use NFC</button></div>
+  <div class="card"><h3 data-i18n="i.id.manualTitle">Enter details manually</h3><p class="muted" data-i18n="i.id.manualText">Type your details and get a pre-authorised QR code with a PIN. Nothing is verified, so the PID is marked self-asserted.</p><a class="btn secondary" href="/manual.html" data-i18n="i.id.useManual">Enter details</a></div>
   <div class="card"><h3 data-i18n="i.id.ocrTitle">Scan document + selfie</h3><p class="muted" data-i18n="i.id.ocrText">Point your camera at the document; it is captured automatically. Then take a live selfie to compare with the portrait.</p><button class="btn" data-m="ocr" data-i18n="i.id.useOcr">Scan document</button></div>
 </section>
 <section id="session" class="hidden">

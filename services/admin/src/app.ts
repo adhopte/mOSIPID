@@ -30,7 +30,9 @@ export function buildApp(cfg: AdminConfig) {
     const b = stored ?? def;
     if (!b) return undefined;
     const hasLogo = !!(await cfg.store.get(LOGO_NS, tenant));
-    return { ...b, logoUrl: hasLogo ? `${base()}/assets/logo/${tenant}?v=${encodeURIComponent(b.updatedAt ?? '0')}` : undefined };
+    const logoUrl = hasLogo ? `${base()}/assets/logo/${tenant}?v=${encodeURIComponent(b.updatedAt ?? '0')}`
+      : def?.defaultLogo ? `${base()}/assets/default/bluetiger.png` : undefined;
+    return { ...b, defaultLogo: def?.defaultLogo, logoUrl };
   };
   const allTenants = async () => {
     const ids = new Set([...Object.keys(DEFAULT_BRANDING), ...(await cfg.store.list(NS)).map((e) => e.key)]);
@@ -50,6 +52,12 @@ export function buildApp(cfg: AdminConfig) {
     if (!b) throw new HttpError(404, 'unknown_tenant');
     res.type('text/css').send(`:root{--primary:${b.colors.primary};--secondary:${b.colors.secondary};--bg:${b.colors.background};--surface:${b.colors.surface};--text:${b.colors.text};--accent:${b.colors.accent}}`);
   }));
+  app.get('/assets/default/bluetiger.png', (_req, res) => {
+    res.setHeader('cache-control', 'public, max-age=86400');
+    res.setHeader('access-control-allow-origin', '*');
+    res.setHeader('cross-origin-resource-policy', 'cross-origin');
+    res.sendFile(path.resolve(__dirname, '../../../packages/web-shared/brand/bluetiger-logo.png'));
+  });
   app.get('/assets/logo/:tenant', wrap(async (req, res) => {
     const l = await cfg.store.get<{ mime: string; b64: string }>(LOGO_NS, req.params.tenant);
     if (!l) throw new HttpError(404, 'no_logo');

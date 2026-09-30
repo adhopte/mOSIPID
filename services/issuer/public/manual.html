@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issuer</title><link rel="stylesheet" href="/shared/base.css"><link rel="icon" href="/shared/brand/favicon.png"></head>
+<body>
+<header class="top"><div class="in"><img class="logo" alt=""><a class="brand" data-brand-name href="/" style="color:#fff;text-decoration:none">Issuer</a><span data-lang-switcher></span></div></header>
+<main>
+<h1 data-i18n="i.manual.title">Enter your details</h1>
+<p class="lead" data-i18n="i.manual.lead">Type your identity details, then scan the QR code with your wallet. The PID is issued with a pre-authorised code and a PIN.</p>
+<div class="msg err" data-i18n="i.manual.warning">These details are not verified. The credential is marked “self-asserted” – use NFC or document scan for a verified identity.</div>
+<div class="grid">
+<form id="f" class="card">
+  <div class="row"><div style="flex:1;min-width:150px"><label for="fn" data-i18n="claim.family_name">Family name</label><input id="fn" required maxlength="78" autocomplete="family-name"></div>
+  <div style="flex:1;min-width:150px"><label for="gn" data-i18n="claim.given_name">Given names</label><input id="gn" required maxlength="78" autocomplete="given-name"></div></div>
+  <div class="row"><div style="flex:1;min-width:150px"><label for="bd" data-i18n="claim.birth_date">Date of birth</label><input id="bd" type="date" required autocomplete="bday"></div>
+  <div style="flex:1;min-width:120px"><label for="sx" data-i18n="claim.sex">Sex</label><select id="sx"><option value="F">F</option><option value="M">M</option><option value="X">X</option></select></div></div>
+  <div class="row"><div style="flex:1;min-width:150px"><label for="nt" data-i18n="claim.nationality">Nationality</label><input id="nt" value="IND" maxlength="3" pattern="[A-Za-z]{3}" title="ICAO 3-letter code, e.g. IND, FRA, ESP"></div>
+  <div style="flex:1;min-width:150px"><label for="dn" data-i18n="i.manual.docNo">Passport / ID number (optional)</label><input id="dn" maxlength="20" autocapitalize="characters"></div></div>
+  <label for="pt" data-i18n="i.manual.portrait">Portrait photo (optional)</label><input id="pt" type="file" accept="image/*">
+  <img id="ptPrev" alt="" class="hidden" style="width:90px;height:120px;object-fit:cover;border-radius:10px;margin-top:8px">
+  <div id="err" class="msg err hidden"></div>
+  <p><button class="btn" data-i18n="i.manual.submit">Create QR code</button></p>
+</form>
+<section id="res" class="card hidden">
+  <h3 data-i18n="i.scan.title">Scan with your wallet</h3>
+  <div class="qrbox"><img id="qr" alt="QR code"></div>
+  <p><span data-i18n="i.uni.pin">PIN to enter in the wallet</span>: <span class="pill" id="pin" style="font-size:1.6rem;letter-spacing:.2em"></span></p>
+  <p><span class="pill err" data-i18n="i.manual.selfAsserted">Assurance: self-asserted</span></p>
+  <p><a id="deep" class="btn secondary" data-i18n="i.scan.open">Open in wallet</a></p>
+</section>
+</div>
+</main>
+<footer data-i18n="common.mockNotice">Demonstration system using a mock IACA. Not for production use.</footer>
+<script src="/config.js"></script><script src="/shared/app.js"></script>
+<script>
+(async () => {
+  await App.init({ tenant: 'issuer-id', titleKey: 'i.manual.title' });
+  const $ = (i) => document.getElementById(i); let portrait = null;
+  if (App.config.manualPid === false) { $('f').innerHTML = '<p class="msg err">Manual entry is disabled on this issuer.</p>'; return; }
+  $('pt').onchange = (e) => {           // downscale in the browser: a 240×320 JPEG is all the credential needs
+    const f = e.target.files[0]; if (!f) { portrait = null; $('ptPrev').classList.add('hidden'); return; }
+    const img = new Image(); img.onload = () => {
+      const c = document.createElement('canvas'); c.width = 240; c.height = 320; const g = c.getContext('2d');
+      const s = Math.max(240 / img.width, 320 / img.height); g.drawImage(img, (240 - img.width * s) / 2, (320 - img.height * s) / 2, img.width * s, img.height * s);
+      portrait = c.toDataURL('image/jpeg', 0.8); $('ptPrev').src = portrait; $('ptPrev').classList.remove('hidden');
+    }; img.src = URL.createObjectURL(f);
+  };
+  $('f').onsubmit = async (e) => {
+    e.preventDefault(); $('err').classList.add('hidden');
+    try {
+      const r = await App.api('/api/pid/manual', { method: 'POST', body: { family_name: $('fn').value, given_names: $('gn').value, birth_date: $('bd').value, sex: $('sx').value, nationality: $('nt').value, document_number: $('dn').value, portrait } });
+      $('qr').src = App.qrUrl(r.offer_uri); $('deep').href = r.offer_uri; $('pin').textContent = r.tx_code; $('res').classList.remove('hidden');
+    } catch (err) { $('err').textContent = err.message || App.t('err.generic'); $('err').classList.remove('hidden'); }
+  };
+})();
+</script>
+</body></html>

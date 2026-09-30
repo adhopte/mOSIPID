@@ -1,23 +1,58 @@
 {
   "expo": {
-    "name": "MOSIP-ID Proximity Verifier",
+    "name": "Blue Tiger Verifier",
     "slug": "mosipid-proximity-verifier",
     "scheme": "mosipidverifier",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": { "bundleIdentifier": "io.mosipid.proximityverifier", "supportsTablet": true, "infoPlist": { "NSCameraUsageDescription": "The camera scans the QR code shown by the holder's wallet." } },
-    "android": { "package": "io.mosipid.proximityverifier", "permissions": ["android.permission.CAMERA"] },
+    "ios": {
+      "bundleIdentifier": "io.mosipid.proximityverifier",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "The camera scans the QR code shown by the holder's wallet."
+      }
+    },
+    "android": {
+      "package": "io.mosipid.proximityverifier",
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A1230"
+      },
+      "predictiveBackGestureEnabled": false
+    },
     "plugins": [
-      ["expo-camera", { "cameraPermission": "The camera scans the QR code shown by the holder's wallet." }],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A1230"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "The camera scans the QR code shown by the holder's wallet."
+        }
+      ],
       "expo-localization",
       "expo-dev-client"
     ],
     "extra": {
-      "adminUrl": "https://mosipid-admin.onrender.com",
-      "issuerUrl": "https://mosipid-issuer.onrender.com",
-      "verifierUrl": "https://mosipid-verifier.onrender.com"
+      "adminUrl": "https://bluetiger-inji-admin.onrender.com",
+      "issuerUrl": "https://bluetiger-inji-issuer.onrender.com",
+      "verifierUrl": "https://bluetiger-inji-verifier.onrender.com"
+    },
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#0A1230",
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

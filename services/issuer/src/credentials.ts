@@ -6,7 +6,13 @@ import { randomInt } from 'node:crypto';
 
 export interface VerifiedIdentity {
   familyName: string; givenNames: string; birthDate: string; sex: 'M' | 'F' | 'X'; nationality: string;
-  method: 'nfc' | 'ocr'; portrait?: string /* base64 jpeg */; demoAssurance: boolean; passiveAuth?: 'verified' | 'demo';
+  method: 'nfc' | 'ocr' | 'manual';
+  /** where the evidence came from: NFC chip, live camera, an uploaded file, or typed in by the holder */
+  source?: 'chip' | 'camera' | 'upload' | 'manual';
+  ocrSource?: string;
+  portrait?: string /* base64 jpeg */; demoAssurance: boolean; passiveAuth?: 'verified' | 'demo';
+  /** number printed on the source travel document (kept only as evidence, not the credential's document_number) */
+  sourceDocumentNumber?: string;
 }
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -15,7 +21,10 @@ export function buildIdMdoc(id: VerifiedIdentity, holder: Jwk, pki: Pki, cfg: Is
   const now = new Date();
   const until = new Date(now.getTime() + cfg.idValidityDays * 86400_000);
   const expiry = new Date(now); expiry.setUTCFullYear(expiry.getUTCFullYear() + 5);
-  const assurance = id.demoAssurance ? 'demo' : id.method === 'nfc' && id.passiveAuth === 'verified' ? 'high' : 'substantial';
+  // self_asserted: typed in by the holder, nothing verified · low: uploaded image · substantial: live camera + face match ·
+  // high: chip read with passive authentication chained to a trusted CSCA · demo: some check was simulated
+  const assurance = id.method === 'manual' ? 'self_asserted' : id.demoAssurance ? 'demo'
+    : id.method === 'nfc' && id.passiveAuth === 'verified' ? 'high' : id.source === 'upload' ? 'low' : 'substantial';
   const ns: Record<string, unknown> = {
     family_name: id.familyName,
     given_name: id.givenNames,
@@ -29,7 +38,8 @@ export function buildIdMdoc(id: VerifiedIdentity, holder: Jwk, pki: Pki, cfg: Is
     issuing_authority: cfg.issuingAuthority,
     age_over_18: ageOver(id.birthDate, 18),
     age_over_21: ageOver(id.birthDate, 21),
-    verification_method: id.method === 'nfc' ? 'nfc_chip_passive_auth' : 'optical_mrz_face_match',
+    verification_method: id.method === 'nfc' ? 'nfc_chip_passive_auth' : id.method === 'manual' ? 'manual_entry_unverified'
+      : id.source === 'upload' ? 'uploaded_document_face_match' : 'optical_mrz_face_match',
     assurance_level: assurance,
   };
   if (id.portrait) ns.portrait = Buffer.from(id.portrait, 'base64');

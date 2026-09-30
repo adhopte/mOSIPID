@@ -1,0 +1,1 @@
+{ "name": "mosipid-capture", "version": "0.1.0", "private": true, "main": "index.ts", "types": "index.ts", "description": "Android-only Expo module: CameraX + ML Kit document auto-capture, face liveness, PDF/image import. Ported from adhopte/eMRTD-Tester." }

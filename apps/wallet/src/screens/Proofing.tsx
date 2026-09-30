@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import { toBase64 } from '@mosipid/core';
-import { DocumentAutoCapture, SelfieCapture } from './Capture';
+import { useI18n, useBrand, Button, Card, ErrorBox, Field, H, P, Screen } from '@mosipid/mobile-kit';
+import { DocumentAutoCapture } from './Capture';
+import { DocumentCapture, CapturedDocument } from './DocumentCapture';
+import { LivenessCapture, SelfieResult } from './Liveness';
+import { captureAvailable, readBase64 } from '../../modules/mosipid-capture';
 import { nfcAvailable, openNfcSettings, readChipWithMrz } from '../nfc/reader';
-import { useI18n, Button, Card, ErrorBox, Field, H, P, Screen } from '@mosipid/mobile-kit';
 
 async function post(api: string, path: string, body: unknown) {
   const r = await fetch(api + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -12,28 +15,60 @@ async function post(api: string, path: string, body: unknown) {
   return j;
 }
 
-/** Optical path: auto-capture document (server OCR of the MRZ) → live selfie → face match on the issuer. */
+/** Failures that only need a new selfie (the document / chip data is fine). */
+const SELFIE_ONLY = new Set(['liveness_failed', 'liveness_missing', 'face_mismatch', 'selfie_no_face', 'selfie_multiple_faces', 'selfie_image_invalid', 'selfie_unusable']);
+
+function Steps({ current, labels }: { current: number; labels: string[] }) {
+  const { theme } = useBrand();
+  return (
+    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
+      {labels.map((l, i) => (
+        <View key={l} style={{ flex: 1, gap: 4 }}>
+          <View style={{ height: 5, borderRadius: 3, backgroundColor: i <= current ? theme.primary : theme.border }} />
+          <Text style={{ fontSize: 12, fontWeight: i === current ? '800' : '500', color: i <= current ? theme.text : theme.muted }}>{i + 1}. {l}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const errText = (t: (k: string) => string, code?: string) => (code && t('err.' + code) !== 'err.' + code ? t('err.' + code) : t('err.generic'));
+
+/** Optical path: document (auto-capture or upload of image/PDF) → liveness selfie → issuer checks MRZ + face match + liveness. */
 export function OcrProofing({ sid, api, onVerified, onCancel }: { sid: string; api: string; onVerified: () => void; onCancel: () => void }) {
   const { t } = useI18n();
-  const [doc, setDoc] = useState<string | null>(null);
+  const [doc, setDoc] = useState<CapturedDocument | { fallbackImage: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const submit = async (selfie: { selfie: string; frames: string[] }) => {
+  const labels = [t('w.step.document'), t('w.step.selfie'), t('w.step.verify')];
+
+  const submit = async (s: SelfieResult) => {
     setBusy(true); setErr(null);
-    try { await post(api, `/api/proofing/${sid}/ocr`, { image: doc, selfie: selfie.selfie, liveness_frames: selfie.frames }); onVerified(); }
-    catch (e: any) { setErr(t('err.' + e.code) === 'err.' + e.code ? t('err.generic') : t('err.' + e.code)); setDoc(null); }
-    finally { setBusy(false); }
+    try {
+      const payload: Record<string, unknown> = { selfie: s.selfie, turn_left: s.turnLeft, turn_right: s.turnRight, liveness_report: s.report };
+      if (doc && 'uris' in doc) { payload.images = await Promise.all(doc.uris.map(readBase64)); payload.ocr_text = doc.ocrText; payload.capture_source = doc.source; }
+      else if (doc) { payload.image = doc.fallbackImage; payload.capture_source = 'camera'; }
+      await post(api, `/api/proofing/${sid}/ocr`, payload);
+      onVerified();
+    } catch (e: any) {
+      setErr(errText(t, e.code));
+      if (!SELFIE_ONLY.has(e.code)) setDoc(null);
+    } finally { setBusy(false); }
   };
+
   return (
     <Screen title={t('w.ocr.title')} onBack={onCancel}>
+      <Steps current={busy ? 2 : doc ? 1 : 0} labels={labels} />
       <ErrorBox message={err} />
-      {!doc ? <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })} onCaptured={(img) => setDoc(img)} />
-        : busy ? <Card><H>{t('w.proof.checking')}</H></Card> : <SelfieCapture onDone={submit} />}
+      {busy ? <Card><H>{t('w.proof.checking')}</H><P muted>{t('w.proof.checkingHint')}</P></Card>
+        : !doc ? (captureAvailable ? <DocumentCapture onDone={setDoc} onCancel={onCancel} />
+          : <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })} onCaptured={(img) => setDoc({ fallbackImage: img })} />)
+        : <LivenessCapture onDone={submit} />}
     </Screen>
   );
 }
 
-/** NFC path: MRZ (typed or scanned) → BAC → read DG1/DG2/SOD → live selfie → passive authentication on the issuer. */
+/** NFC path: MRZ (typed, scanned or read from an uploaded file) → BAC → DG1/DG2/SOD → liveness selfie → passive authentication. */
 export function NfcProofing({ sid, api, onVerified, onCancel }: { sid: string; api: string; onVerified: () => void; onCancel: () => void }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<'mrz' | 'can'>('mrz');
@@ -46,6 +81,7 @@ export function NfcProofing({ sid, api, onVerified, onCancel }: { sid: string; a
   const [chip, setChip] = useState<{ dg1: string; dg2: string; sod: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const labels = [t('w.step.chip'), t('w.step.selfie'), t('w.step.verify')];
 
   const validDates = /^\d{4}-\d{2}-\d{2}$/.test(dob) && /^\d{4}-\d{2}-\d{2}$/.test(exp) && docNo.length >= 6;
 
@@ -56,29 +92,39 @@ export function NfcProofing({ sid, api, onVerified, onCancel }: { sid: string; a
     if (avail === 'disabled') { openNfcSettings(); return setErr(t('w.nfc.disabled')); }
     setBusy(true);
     try {
-      const r = await readChipWithMrz({ documentNumber: docNo.trim().toUpperCase(), birthDate: dob, expiryDate: exp }, (stage, d, tot) => setProgress(stage + (tot ? ` ${Math.round(((d ?? 0) / tot) * 100)}%` : '')), t('w.nfc.hold'));
+      const r = await readChipWithMrz({ documentNumber: docNo.trim().toUpperCase(), birthDate: dob, expiryDate: exp },
+        (stage, d, tot) => setProgress(stage + (tot ? ` ${Math.round(((d ?? 0) / tot) * 100)}%` : '')), t('w.nfc.hold'));
       setChip({ dg1: toBase64(r.dg1), dg2: toBase64(r.dg2), sod: toBase64(r.sod) });
     } catch (e: any) { setErr(t('w.nfc.failed') + (e?.message ? ` (${e.message})` : '')); }
     finally { setBusy(false); setProgress(null); }
   };
 
-  const submit = async (s: { selfie: string; frames: string[] }) => {
+  const submit = async (s: SelfieResult) => {
     setBusy(true); setErr(null);
-    try { await post(api, `/api/proofing/${sid}/nfc`, { ...chip, selfie: s.selfie, liveness_frames: s.frames }); onVerified(); }
-    catch (e: any) { setErr(t('err.' + e.code) === 'err.' + e.code ? t('err.generic') : t('err.' + e.code)); setChip(null); }
+    try { await post(api, `/api/proofing/${sid}/nfc`, { ...chip, selfie: s.selfie, turn_left: s.turnLeft, turn_right: s.turnRight, liveness_report: s.report }); onVerified(); }
+    catch (e: any) { setErr(errText(t, e.code)); if (!SELFIE_ONLY.has(e.code)) setChip(null); }
     finally { setBusy(false); }
   };
 
   if (scanning) return (
     <Screen title={t('w.nfc.scanMrz')} onBack={() => setScanning(false)}>
-      <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })}
-        onCaptured={(_img, m) => { if (m) { setDocNo(m.documentNumber); setDob(m.birthDate); setExp(m.expiryDate); } setScanning(false); }} />
+      {captureAvailable
+        ? <DocumentCapture onCancel={() => setScanning(false)} onDone={(d) => { setDocNo(d.mrz.documentNumber); setDob(d.mrz.birthDate); setExp(d.mrz.expiryDate); setScanning(false); }} />
+        : <DocumentAutoCapture probe={(image) => post(api, `/api/proofing/${sid}/probe`, { image })}
+            onCaptured={(_img, m) => { if (m) { setDocNo(m.documentNumber); setDob(m.birthDate); setExp(m.expiryDate); } setScanning(false); }} />}
     </Screen>
   );
-  if (chip) return <Screen title={t('w.selfie.title')} onBack={onCancel}><ErrorBox message={err} />{busy ? <Card><H>{t('w.proof.checking')}</H></Card> : <SelfieCapture onDone={submit} />}</Screen>;
+  if (chip) return (
+    <Screen title={t('w.selfie.title')} onBack={onCancel}>
+      <Steps current={busy ? 2 : 1} labels={labels} />
+      <ErrorBox message={err} />
+      {busy ? <Card><H>{t('w.proof.checking')}</H><P muted>{t('w.proof.checkingHint')}</P></Card> : <LivenessCapture onDone={submit} />}
+    </Screen>
+  );
 
   return (
     <Screen title={t('w.nfc.title')} onBack={onCancel}>
+      <Steps current={0} labels={labels} />
       <P muted>{t('w.nfc.intro')}</P>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}><Button kind={mode === 'mrz' ? 'primary' : 'secondary'} label={t('w.nfc.useMrz')} onPress={() => setMode('mrz')} /></View>
@@ -86,10 +132,10 @@ export function NfcProofing({ sid, api, onVerified, onCancel }: { sid: string; a
       </View>
       {mode === 'mrz' ? (
         <Card>
+          <Button kind="secondary" label={t('w.nfc.scanMrz')} onPress={() => setScanning(true)} />
           <Field label={t('w.nfc.docNo')} value={docNo} onChangeText={setDocNo} autoCapitalize="characters" autoCorrect={false} />
           <Field label={t('w.nfc.dob')} value={dob} onChangeText={setDob} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
           <Field label={t('w.nfc.expiry')} value={exp} onChangeText={setExp} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
-          <Button kind="secondary" label={t('w.nfc.scanMrz')} onPress={() => setScanning(true)} />
         </Card>
       ) : (
         <Card>

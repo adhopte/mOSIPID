@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+        env: { ONNXRUNTIME_NODE_INSTALL_CUDA: skip }
       - run: npm run typecheck
       - run: npm test
         env: { TEST_DATABASE_URL: 'postgres://postgres:pg@localhost:5432/postgres' }
@@ -27,6 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm ci
+        env: { ONNXRUNTIME_NODE_INSTALL_CUDA: skip }
       - working-directory: apps/${{ matrix.app }}
         run: |
           npm ci --legacy-peer-deps

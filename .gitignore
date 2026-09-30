@@ -8,3 +8,6 @@ dist
 coverage
 ios
 android
+
+# face models are downloaded at build time (services/issuer/scripts/fetch-models.js)
+services/issuer/models/*.onnx

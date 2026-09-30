@@ -5,14 +5,15 @@ import { IssuerConfig } from './config';
 import { oid4vciRouter } from './oid4vci';
 import { proofingRouter } from './proofing/routes';
 import { loadPki, trustList, Pki } from './trust';
+import { effectiveProvider } from './proofing/face';
 
 export async function buildApp(store: Store, cfg: IssuerConfig, pkiOverride?: Pki) {
   const pki = pkiOverride ?? (await loadPki(store, cfg.publicUrl));
-  const app = createApp({ name: 'issuer', staticDirs: [path.resolve(__dirname, '../public')], sharedWebDir: sharedWeb(__dirname), jsonLimit: '12mb' });
+  const app = createApp({ name: 'issuer', staticDirs: [path.resolve(__dirname, '../public')], sharedWebDir: sharedWeb(__dirname), jsonLimit: '30mb' });
 
   app.get('/config.js', (_req, res) => res.type('js').send(`window.__CONFIG__=${JSON.stringify({
     adminUrl: cfg.adminUrl, verifierUrl: cfg.verifierUrl, issuerUrl: cfg.publicUrl,
-    demo: { face: cfg.faceProvider === 'mock', passiveAuth: cfg.cscaPems.length === 0 },
+    demo: { face: effectiveProvider(cfg) === 'mock', passiveAuth: cfg.cscaPems.length === 0 }, manualPid: cfg.allowManualPid,
     defaultBranding: DEFAULT_BRANDING['issuer-id'], universityBranding: DEFAULT_BRANDING['issuer-university'],
   })};`));
   app.get('/api/trust', (_req, res) => { res.setHeader('cache-control', 'public, max-age=60'); res.json({ anchors: trustList(pki, cfg.publicUrl) }); });

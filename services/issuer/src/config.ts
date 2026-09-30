@@ -4,7 +4,12 @@ export interface IssuerConfig {
   publicUrl: string;
   adminUrl?: string;
   verifierUrl?: string;
-  faceProvider: 'mock' | 'http';
+  /** auto = opencv when the model files are present, otherwise mock */
+  faceProvider: 'auto' | 'opencv' | 'http' | 'mock';
+  faceRequireLiveness: boolean;
+  allowManualPid: boolean;
+  /** cross-check the phone's ML Kit MRZ text against server-side Tesseract OCR (slower, needs more RAM) */
+  ocrVerifyClient: boolean;
   faceApiUrl?: string;
   faceApiKey?: string;
   faceThreshold: number;
@@ -25,7 +30,10 @@ export function loadConfig(env = process.env, overrides: Partial<IssuerConfig> =
     publicUrl: (env.PUBLIC_URL || baseUrl()).replace(/\/$/, ''),
     adminUrl: env.ADMIN_URL?.replace(/\/$/, ''),
     verifierUrl: env.VERIFIER_URL?.replace(/\/$/, ''),
-    faceProvider: (env.FACE_PROVIDER as any) === 'http' ? 'http' : 'mock',
+    faceProvider: (['opencv', 'http', 'mock'].includes(env.FACE_PROVIDER ?? '') ? env.FACE_PROVIDER : 'auto') as IssuerConfig['faceProvider'],
+    faceRequireLiveness: env.FACE_REQUIRE_LIVENESS !== 'false',
+    allowManualPid: env.ALLOW_MANUAL_PID !== 'false',
+    ocrVerifyClient: env.OCR_VERIFY_CLIENT === 'true',
     faceApiUrl: env.FACE_API_URL,
     faceApiKey: env.FACE_API_KEY,
     faceThreshold: Number(env.FACE_THRESHOLD ?? 0.8),

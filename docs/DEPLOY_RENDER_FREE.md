@@ -21,9 +21,9 @@ Render → **New → Web Service** → connect this GitHub repo/branch. Use thes
 
 | | Name | Build Command | Start Command |
 |---|---|---|---|
-| A | `yourname-admin` | `npm ci --include=dev && npm run build -w @mosipid/admin` | `node services/admin/dist/index.js` |
-| B | `yourname-issuer` | `npm ci --include=dev && npm run build -w @mosipid/issuer` | `node services/issuer/dist/index.js` |
-| C | `yourname-verifier` | `npm ci --include=dev && npm run build -w @mosipid/verifier` | `node services/verifier/dist/index.js` |
+| A | `yourname-admin` | `ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --include=dev && npm run build -w @mosipid/admin` | `node services/admin/dist/index.js` |
+| B | `yourname-issuer` | `ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --include=dev && npm run build -w @mosipid/issuer` | `node services/issuer/dist/index.js` |
+| C | `yourname-verifier` | `ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --include=dev && npm run build -w @mosipid/verifier` | `node services/verifier/dist/index.js` |
 
 Set **Health Check Path** to `/healthz` on each. Names must be globally unique, so prefix them – your URLs will be `https://yourname-admin.onrender.com`, etc. Note all three now.
 

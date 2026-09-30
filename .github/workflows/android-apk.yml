@@ -7,17 +7,17 @@ on:
     tags: ['apk-v*']
   workflow_dispatch:
     inputs:
-      admin_url:    { description: 'Branding portal URL',  default: 'https://mosipid-admin.onrender.com' }
-      issuer_url:   { description: 'Issuer URL',           default: 'https://mosipid-issuer.onrender.com' }
-      verifier_url: { description: 'Verifier URL',         default: 'https://mosipid-verifier.onrender.com' }
+      admin_url:    { description: 'Branding portal URL',  default: 'https://bluetiger-inji-admin.onrender.com' }
+      issuer_url:   { description: 'Issuer URL',           default: 'https://bluetiger-inji-issuer.onrender.com' }
+      verifier_url: { description: 'Verifier URL',         default: 'https://bluetiger-inji-verifier.onrender.com' }
 
 permissions:
   contents: write
 
 env:
-  EXPO_PUBLIC_ADMIN_URL:    ${{ inputs.admin_url    || vars.ADMIN_URL    || 'https://mosipid-admin.onrender.com' }}
-  EXPO_PUBLIC_ISSUER_URL:   ${{ inputs.issuer_url   || vars.ISSUER_URL   || 'https://mosipid-issuer.onrender.com' }}
-  EXPO_PUBLIC_VERIFIER_URL: ${{ inputs.verifier_url || vars.VERIFIER_URL || 'https://mosipid-verifier.onrender.com' }}
+  EXPO_PUBLIC_ADMIN_URL:    ${{ inputs.admin_url    || vars.ADMIN_URL    || 'https://bluetiger-inji-admin.onrender.com' }}
+  EXPO_PUBLIC_ISSUER_URL:   ${{ inputs.issuer_url   || vars.ISSUER_URL   || 'https://bluetiger-inji-issuer.onrender.com' }}
+  EXPO_PUBLIC_VERIFIER_URL: ${{ inputs.verifier_url || vars.VERIFIER_URL || 'https://bluetiger-inji-verifier.onrender.com' }}
 
 jobs:
   apk:
@@ -37,6 +37,7 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Install shared packages (repo root)
         run: npm ci
+        env: { ONNXRUNTIME_NODE_INSTALL_CUDA: skip }
       - name: Install app dependencies
         run: npm ci --legacy-peer-deps
         working-directory: apps/${{ matrix.app }}

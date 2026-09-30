@@ -50,7 +50,7 @@ test('dynamic key families are complete', () => {
   for (const c of ['primary', 'secondary', 'background', 'surface', 'text', 'accent']) assert.ok(`admin.color.${c}` in en);
   // every rejection code the issuer can return has a translated message
   const routes = readFileSync(join(root, 'services/issuer/src/proofing/routes.ts'), 'utf8');
-  const codes = new Set([...routes.matchAll(/'((?:mrz|document|face|sod|csca|dg[12]|passive|selfie)_[a-z0-9_]+)'/g)].map((m) => m[1]));
+  const codes = new Set([...(routes + readFileSync(join(root, 'services/issuer/src/proofing/face.ts'), 'utf8')).matchAll(/'((?:mrz|document|face|sod|csca|dg[12]|passive|selfie|liveness|chip)_[a-z0-9_]+)'/g)].map((m) => m[1]));
   for (const c of ['sod_hash_mismatch_dg1', 'sod_hash_mismatch_dg2']) codes.add(c);
   for (const c of codes) assert.ok(`err.${c}` in en, `err.${c} missing`);
 });

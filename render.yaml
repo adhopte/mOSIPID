@@ -13,11 +13,11 @@ databases:
 services:
   # ------------------------------------------------------------------ Central branding / asset portal
   - type: web
-    name: mosipid-admin
+    name: bluetiger-inji-admin
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm ci --include=dev && npm run build -w @mosipid/admin
+    buildCommand: ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --include=dev && npm run build -w @mosipid/admin
     startCommand: node services/admin/dist/index.js
     healthCheckPath: /healthz
     autoDeploy: true
@@ -31,12 +31,12 @@ services:
 
   # ------------------------------------------------------------------ Issuer (OID4VCI + identity proofing + mock IACA)
   - type: web
-    name: mosipid-issuer
+    name: bluetiger-inji-issuer
     runtime: node
     region: oregon
     # OCR (tesseract) + image processing need more than the 512 MB of the free plan; use `free` only with OCR_PROVIDER=mock.
     plan: starter
-    buildCommand: npm ci --include=dev && npm run build -w @mosipid/issuer
+    buildCommand: ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --include=dev && npm run build -w @mosipid/issuer
     startCommand: node services/issuer/dist/index.js
     healthCheckPath: /healthz
     autoDeploy: true
@@ -44,8 +44,8 @@ services:
       - { key: NODE_VERSION, value: "22" }
       - { key: NODE_ENV, value: production }
       - { key: DATABASE_URL, fromDatabase: { name: mosipid-db, property: connectionString } }
-      - { key: ADMIN_URL, sync: false }        # e.g. https://mosipid-admin.onrender.com
-      - { key: VERIFIER_URL, sync: false }     # e.g. https://mosipid-verifier.onrender.com
+      - { key: ADMIN_URL, sync: false }        # e.g. https://bluetiger-inji-admin.onrender.com
+      - { key: VERIFIER_URL, sync: false }     # e.g. https://bluetiger-inji-verifier.onrender.com
       - { key: OCR_PROVIDER, value: tesseract }
       - { key: FACE_PROVIDER, value: mock }    # "http" + FACE_API_URL for a real face-match/liveness service
       - { key: PASSIVE_AUTH, value: demo }     # "strict" + CSCA_PEM once you have real CSCA certificates
@@ -53,11 +53,11 @@ services:
 
   # ------------------------------------------------------------------ Verifier (OID4VP relying-party demos + proximity relay)
   - type: web
-    name: mosipid-verifier
+    name: bluetiger-inji-verifier
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm ci --include=dev && npm run build -w @mosipid/verifier
+    buildCommand: ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --include=dev && npm run build -w @mosipid/verifier
     startCommand: node services/verifier/dist/index.js
     healthCheckPath: /healthz
     autoDeploy: true

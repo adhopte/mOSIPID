@@ -16,6 +16,7 @@
   },
   "include": [
     "src",
+    "modules",
     "index.js",
     "../../packages/core/src/**/*.ts",
     "../../packages/mobile-kit/src/**/*"

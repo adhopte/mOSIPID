@@ -175,6 +175,37 @@ let realJpeg = Buffer.alloc(4000, 9);
 before(async () => { try { const sharp = (await import('sharp')).default; realJpeg = await sharp({ create: { width: 120, height: 160, channels: 3, background: { r: 200, g: 120, b: 90 } } }).jpeg().toBuffer(); } catch { /* sharp optional */ } });
 const fakeImg = () => realJpeg.toString('base64');
 
+test('manual PID entry → pre-authorised offer with PIN → mdoc marked self_asserted', async () => {
+  const bad = await post(`${issuer}/api/pid/manual`, { family_name: 'X1', given_names: 'Asha', birth_date: '1990-01-01' });
+  assert.equal(bad.status, 400);
+  assert.equal((await post(`${issuer}/api/pid/manual`, { family_name: 'Verma', given_names: 'Asha', birth_date: '2999-01-01' })).status, 400);
+  const r = await (await post(`${issuer}/api/pid/manual`, { family_name: 'verma', given_names: 'asha rani', birth_date: '1990-05-17', sex: 'F', nationality: 'ind', document_number: 'p1234567' })).json();
+  assert.match(r.tx_code, /^\d{4}$/); assert.equal(r.assurance_level, 'self_asserted');
+  const offer = await resolveOffer(r.offer_uri);
+  await assert.rejects(receivePreAuthorized({ offer, txCode: r.tx_code === '0000' ? '1111' : '0000' }));
+  const [cred] = await receivePreAuthorized({ offer, txCode: r.tx_code });
+  const c = listIssuerSignedClaims(b64u.decode(cred.raw))[NS_ID];
+  assert.equal(c.family_name, 'Verma'); assert.equal(c.given_name, 'Asha Rani'); assert.equal(c.nationality, 'IN');
+  assert.equal(c.assurance_level, 'self_asserted'); assert.equal(c.verification_method, 'manual_entry_unverified');
+  assert.equal(c.age_over_18, true);
+  // and it is still a valid, verifiable credential
+  const { req, matches } = await remoteLogin('electricity', [cred]);
+  await submitResponse(req, matches);
+});
+
+test('uploaded document image: ML Kit text from the phone is accepted, flagged as upload (low assurance)', async () => {
+  const good = td3({ surname: 'ERIKSSON', given: 'ANNA<MARIA', docNo: 'L898902C3', dob: '740812', exp: future });
+  const { creds } = await enrollAndIssue('ocr', async (sid) => {
+    // the phone read the MRZ with ML Kit (noisy text); the server never needs to OCR it
+    const ocrText = 'REPUBLIC OF UTOPIA\n' + good[0] + '\n' + good[1].replace('UTO', 'UT0');
+    assert.equal((await post(`${issuer}/api/proofing/${sid}/ocr`, { images: [fakeImg(), fakeImg()], selfie: fakeImg(), ocr_text: 'garbage', capture_source: 'upload', debug_mrz: undefined })).status, 422);
+    return post(`${issuer}/api/proofing/${sid}/ocr`, { images: [fakeImg(), fakeImg()], selfie: fakeImg(), turn_left: fakeImg(), turn_right: fakeImg(), ocr_text: ocrText, capture_source: 'upload' });
+  });
+  const c = listIssuerSignedClaims(b64u.decode(creds[0].raw))[NS_ID];
+  assert.equal(c.verification_method, 'uploaded_document_face_match');
+  assert.equal(c.family_name, 'Eriksson');
+});
+
 test('ID via optical MRZ + selfie: failure paths then success', async () => {
   const good = td3({ surname: 'ERIKSSON', given: 'ANNA<MARIA', docNo: 'L898902C3', dob: '740812', exp: future });
   const { creds, sid } = await enrollAndIssue('ocr', async (sid) => {
@@ -322,4 +353,8 @@ test('admin portal: branding is public, edits require login, validation and logo
   assert.equal((await fetch(`${admin}/api/branding/verifier-electricity`, { method: 'DELETE', headers: { 'content-type': 'application/json', cookie } })).status, 200);
   const reset = await (await fetch(`${admin}/api/branding/verifier-electricity`)).json();
   assert.equal(reset.names.en, 'VoltEdge Electricity'); assert.equal(reset.logoUrl, undefined);
+  // tenants with a built-in logo get the Blue Tiger default until an admin uploads one
+  const wb = await (await fetch(`${admin}/api/branding/wallet`)).json();
+  assert.match(wb.logoUrl, /assets\/default\/bluetiger.png/);
+  assert.equal((await fetch(wb.logoUrl)).headers.get('content-type'), 'image/png');
 });
