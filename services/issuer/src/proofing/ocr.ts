@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { extractMrz, MrzData } from '@mosipid/core';
 import { IssuerConfig } from '../config';
 import { mrzRegions } from './images';
@@ -6,7 +7,9 @@ let workerP: Promise<any> | undefined;
 async function worker() {
   workerP ??= (async () => {
     const { createWorker } = await import('tesseract.js');
-    const w = await createWorker('eng', 1, { cachePath: process.env.TESSDATA_CACHE || '/tmp/tessdata' });
+    // eng.traineddata ships in the npm package, so no CDN download is needed at runtime (works offline / behind proxies)
+    const langPath = path.join(path.dirname(require.resolve('@tesseract.js-data/eng/package.json')), '4.0.0_best_int');
+    const w = await createWorker('eng', 1, { langPath, cachePath: process.env.TESSDATA_CACHE || '/tmp/tessdata' });
     await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<', preserve_interword_spaces: '0' });
     return w;
   })();

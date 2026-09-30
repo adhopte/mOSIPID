@@ -16,7 +16,11 @@ export class MemoryStore implements Store {
   async get(ns: string, key: string) { const e = this.m.get(this.k(ns, key)); if (!this.alive(e)) { this.m.delete(this.k(ns, key)); return undefined; } return structuredClone(e!.v); }
   async set(ns: string, key: string, value: unknown, ttlSec?: number) { this.m.set(this.k(ns, key), { v: structuredClone(value), exp: ttlSec ? Date.now() + ttlSec * 1000 : undefined }); }
   async del(ns: string, key: string) { this.m.delete(this.k(ns, key)); }
-  async take(ns: string, key: string) { const v = await this.get(ns, key); await this.del(ns, key); return v; }
+  async take(ns: string, key: string) {
+    // read+delete must not yield to the event loop in between, or concurrent callers could all "win"
+    const k = this.k(ns, key); const e = this.m.get(k); this.m.delete(k);
+    return this.alive(e) ? structuredClone(e!.v) : undefined;
+  }
   async list(ns: string) {
     const out: { key: string; value: any }[] = [];
     for (const [k, e] of this.m) if (k.startsWith(ns + '\u0000') && this.alive(e)) out.push({ key: k.split('\u0000')[1], value: structuredClone(e.v) });

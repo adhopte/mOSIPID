@@ -113,14 +113,31 @@ export function extractMrz(ocrText: string): MrzData | null {
   return best;
 }
 
+const TO_DIGIT: Record<string, string> = { O: '0', Q: '0', D: '0', I: '1', L: '1', B: '8', S: '5', Z: '2', G: '6' };
+const TO_ALPHA: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z', '6': 'G' };
+const digits = (s: string) => s.replace(/[OQDILBSZG]/g, (c) => TO_DIGIT[c] ?? c);
+const letters = (s: string) => s.replace(/[0-9]/g, (c) => TO_ALPHA[c] ?? c);
+
+/**
+ * Repair typical OCR confusions in the data line: letters in numeric fields, digits in alphabetic fields
+ * (nationality), and an unreadable composite check digit (recomputed only when every field-level check passes).
+ */
 function fixNumericFields(line: string): string {
-  const map: Record<string, string> = { O: '0', Q: '0', D: '0', I: '1', L: '1', B: '8', S: '5', Z: '2', G: '6' };
-  const fix = (s: string) => s.replace(/[OQDILBSZG]/g, (c) => map[c] ?? c);
-  const a = line.split('');
-  const ranges = line.length === 30 ? [[14, 15], [0, 7], [8, 15], [29, 30]] : line.length === 44 || line.length === 36 ? [[9, 10], [13, 20], [21, 28], [line.length - 1, line.length]] : [];
-  // only apply to lines that look like the second line (contain digits densely)
   if (!/\d{6}/.test(line)) return line;
-  for (const [s, e] of ranges) { const f = fix(line.slice(s, e)); for (let i = 0; i < f.length; i++) a[s + i] = f[i]; }
+  const a = line.split('');
+  const put = (s: number, e: number, f: (x: string) => string) => { const r = f(line.slice(s, e)); for (let i = 0; i < r.length; i++) a[s + i] = r[i]; };
+  if (line.length === 30) { put(14, 15, digits); put(0, 7, digits); put(8, 15, digits); put(15, 18, letters); put(29, 30, digits); }
+  else if (line.length === 44 || line.length === 36) {
+    const n = line.length;
+    put(9, 10, digits); put(10, 13, letters); put(13, 20, digits); put(21, 28, digits); put(n - 1, n, digits);
+    if (n === 44 && a[42] !== '<') put(42, 43, digits);
+    const fields = [a.slice(0, 9).join(''), a[9], a.slice(13, 19).join(''), a[19], a.slice(21, 27).join(''), a[27]];
+    const okFields = checkDigit(fields[0]) === fields[1] && checkDigit(fields[2]) === fields[3] && checkDigit(fields[4]) === fields[5];
+    if (okFields && !/\d/.test(line[n - 1])) {
+      const composite = a.slice(0, 10).join('') + a.slice(13, 20).join('') + a.slice(21, n - 1).join('');
+      a[n - 1] = checkDigit(composite);
+    }
+  }
   return a.join('');
 }
 

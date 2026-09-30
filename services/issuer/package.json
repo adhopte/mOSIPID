@@ -4,12 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:pg --external:express --external:qrcode --external:sharp --external:tesseract.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:pg --external:express --external:qrcode --external:sharp --external:tesseract.js --external:@tesseract.js-data/eng",
     "start": "node dist/index.js",
     "typecheck": "tsc -p . --noEmit",
     "test": "tsx --test test/*.test.ts",
     "gen:iaca": "tsx src/gen-iaca.ts"
   },
-  "dependencies": { "@mosipid/core": "*", "@mosipid/server-kit": "*", "tesseract.js": "^5.1.1" },
-  "optionalDependencies": { "sharp": "^0.33.5" }
+  "dependencies": {
+    "@mosipid/core": "*",
+    "@mosipid/server-kit": "*",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "tesseract.js": "^5.1.1"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.5"
+  }
 }

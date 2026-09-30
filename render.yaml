@@ -1,0 +1,70 @@
+# Render Blueprint – deploys the three backend services + Postgres from this repo.
+# Dashboard → New → Blueprint → select this repo. Render will prompt for the `sync: false` values
+# (the public URLs of the other services – see docs/DEPLOY_RENDER.md, step 3).
+databases:
+  - name: mosipid-db
+    databaseName: mosipid
+    user: mosipid
+    region: oregon
+    # Free Postgres expires after 30 days. Use `basic-256mb` (or higher) for anything you want to keep,
+    # or pin the mock IACA keys in env vars (npm run gen:iaca) so trust anchors survive a DB reset.
+    plan: free
+
+services:
+  # ------------------------------------------------------------------ Central branding / asset portal
+  - type: web
+    name: mosipid-admin
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build -w @mosipid/admin
+    startCommand: node services/admin/dist/index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - { key: NODE_VERSION, value: "22" }
+      - { key: NODE_ENV, value: production }
+      - { key: DATABASE_URL, fromDatabase: { name: mosipid-db, property: connectionString } }
+      - { key: ADMIN_USER, value: admin }
+      - { key: ADMIN_PASSWORD, generateValue: true }   # read it in the dashboard → Environment
+      - { key: SESSION_SECRET, generateValue: true }
+
+  # ------------------------------------------------------------------ Issuer (OID4VCI + identity proofing + mock IACA)
+  - type: web
+    name: mosipid-issuer
+    runtime: node
+    region: oregon
+    # OCR (tesseract) + image processing need more than the 512 MB of the free plan; use `free` only with OCR_PROVIDER=mock.
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build -w @mosipid/issuer
+    startCommand: node services/issuer/dist/index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - { key: NODE_VERSION, value: "22" }
+      - { key: NODE_ENV, value: production }
+      - { key: DATABASE_URL, fromDatabase: { name: mosipid-db, property: connectionString } }
+      - { key: ADMIN_URL, sync: false }        # e.g. https://mosipid-admin.onrender.com
+      - { key: VERIFIER_URL, sync: false }     # e.g. https://mosipid-verifier.onrender.com
+      - { key: OCR_PROVIDER, value: tesseract }
+      - { key: FACE_PROVIDER, value: mock }    # "http" + FACE_API_URL for a real face-match/liveness service
+      - { key: PASSIVE_AUTH, value: demo }     # "strict" + CSCA_PEM once you have real CSCA certificates
+      - { key: REQUIRE_SELFIE, value: "true" }
+
+  # ------------------------------------------------------------------ Verifier (OID4VP relying-party demos + proximity relay)
+  - type: web
+    name: mosipid-verifier
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build -w @mosipid/verifier
+    startCommand: node services/verifier/dist/index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - { key: NODE_VERSION, value: "22" }
+      - { key: NODE_ENV, value: production }
+      - { key: DATABASE_URL, fromDatabase: { name: mosipid-db, property: connectionString } }
+      - { key: SESSION_SECRET, generateValue: true }
+      - { key: ADMIN_URL, sync: false }
+      - { key: ISSUER_URL, sync: false }       # trust anchors (IACA + education CA) are fetched from here

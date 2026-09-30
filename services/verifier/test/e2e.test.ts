@@ -6,10 +6,10 @@ import { createPrivateKey, sign as cryptoSign, createHash } from 'node:crypto';
 import {
   resolveOffer, receivePreAuthorized, resolveAuthorizationRequest, matchCredentials, submitResponse, claimsToShare, fetchIssuerMetadata, fetchAuthServerMetadata,
   createPkce, buildAuthorizationUrl, tokenAuthorizationCode, requestCredential, toStoredCredential, generateKeyPair, parseQuery, checkDigit, derEnc, b64u, toBase64,
-  createRootCa, issueDocumentSigner, rememberDn, HolderProximity, ReaderProximity, parseCert, oid, StoredCredential, DOCTYPE_ID, NS_ID, listIssuerSignedClaims,
+  createRootCa, issueDocumentSigner, receiveWithAuthorizationCode, rememberDn, HolderProximity, ReaderProximity, parseCert, oid, StoredCredential, DOCTYPE_ID, NS_ID, listIssuerSignedClaims,
   buildDeviceResponse, openid4vpTranscript, concat, utf8,
 } from '@mosipid/core';
-import { MemoryStore } from '@mosipid/server-kit';
+import { MemoryStore, PgStore, Store } from '@mosipid/server-kit';
 import { buildApp as buildAdmin } from '../../admin/src/app';
 import { buildApp as buildIssuer } from '../../issuer/src/app';
 import { loadConfig } from '../../issuer/src/config';
@@ -24,13 +24,25 @@ let admin: string, issuer: string, verifier: string;
 let wallet: StoredCredential[] = [];
 const csca = rememberDn(createRootCa({ subject: { C: 'UT', O: 'Utopia', CN: 'Utopia CSCA' } }), { C: 'UT', O: 'Utopia', CN: 'Utopia CSCA' });
 
+// TEST_DATABASE_URL=postgres://… runs the whole suite against a real Postgres (all three services share one DB, as on Render)
+async function makeStore(): Promise<Store> {
+  if (!process.env.TEST_DATABASE_URL) return new MemoryStore();
+  const pg: any = await import('pg');
+  const s = new PgStore(process.env.TEST_DATABASE_URL, pg.default ?? pg);
+  await new Promise((r) => setTimeout(r, 300));
+  await (s as any).pool.query('DROP TABLE IF EXISTS kv');
+  (s as any).ready = (s as any).pool.query('CREATE TABLE IF NOT EXISTS kv (ns text NOT NULL, key text NOT NULL, value jsonb NOT NULL, expires_at timestamptz, PRIMARY KEY (ns, key))');
+  return s;
+}
+
 before(async () => {
+  const sharedStore = await makeStore();
   const [pa, pi, pv] = [await freePort(), await freePort(), await freePort()];
   admin = `http://127.0.0.1:${pa}`; issuer = `http://127.0.0.1:${pi}`; verifier = `http://127.0.0.1:${pv}`;
-  await listen(buildAdmin({ store: new MemoryStore(), user: 'root', password: 's3cret', secret: 'x'.repeat(32), publicUrl: admin }), pa);
+  await listen(buildAdmin({ store: sharedStore, user: 'root', password: 's3cret', secret: 'x'.repeat(32), publicUrl: admin }), pa);
   const cfg = loadConfig({}, { publicUrl: issuer, adminUrl: admin, ocrProvider: 'mock', cscaPems: [csca.pem], passiveAuth: 'strict', faceProvider: 'mock' });
-  await listen(await buildIssuer(new MemoryStore(), cfg), pi);
-  await listen(buildVerifier(new MemoryStore(), { publicUrl: verifier, adminUrl: admin, issuerUrl: issuer, secret: 'y'.repeat(32), brandCacheMs: 0 }, new TrustService([issuer])), pv);
+  await listen(await buildIssuer(sharedStore, cfg), pi);
+  await listen(buildVerifier(sharedStore, { publicUrl: verifier, adminUrl: admin, issuerUrl: issuer, secret: 'y'.repeat(32), brandCacheMs: 0 }, new TrustService([issuer])), pv);
 });
 after(() => { servers.forEach((s) => s.close()); setTimeout(() => process.exit(0), 100).unref(); });
 
@@ -126,6 +138,21 @@ test('degree attestation via authorization-code flow + PKCE + University ID logi
   // disallowed redirect_uri is refused
   const evil = await fetch(buildAuthorizationUrl({ endpoint: as.authorization_endpoint!, clientId: 'x', redirectUri: 'https://evil.example/cb', scope: 'university_degree', state: 's', challenge: pkce.challenge, issuer }), { redirect: 'manual' });
   assert.equal(evil.status, 400);
+});
+
+test('wallet helper receiveWithAuthorizationCode drives the whole flow (browser callback simulated)', async () => {
+  const offer = await resolveOffer((await (await post(`${issuer}/api/university/offer`, {})).json()).offer_uri);
+  const creds = await receiveWithAuthorizationCode({
+    offer, clientId: 'mosipid-wallet', redirectUri: 'mosipidwallet://oauth/callback',
+    authorize: async (url) => {
+      const r = await fetch(url, { redirect: 'manual' });
+      const req = parseQuery(r.headers.get('location')!).req;
+      return (await (await post(`${issuer}/authorize/login`, { req, studentId: 'BIT2022DS003', dob: '2000-12-09' })).json()).redirect;
+    },
+  });
+  assert.equal(creds.length, 1); assert.equal(creds[0].configId, 'university_degree_sdjwt');
+  // a cancelled browser session surfaces as an error, not a hang
+  await assert.rejects(receiveWithAuthorizationCode({ offer, clientId: 'x', redirectUri: 'mosipidwallet://oauth/callback', authorize: async () => 'mosipidwallet://oauth/callback?error=access_denied' }), /access_denied/);
 });
 
 async function enrollAndIssue(method: 'ocr' | 'nfc', proof: (sid: string) => Promise<Response>) {

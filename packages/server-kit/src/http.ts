@@ -45,6 +45,7 @@ export function createApp(opts: { name: string; staticDirs?: string[]; sharedWeb
   app.use(express.json({ limit: opts.jsonLimit ?? '2mb' }));
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
+  app.get('/favicon.ico', (_req, res) => res.status(204).end());
   app.get('/healthz', (_req, res) => res.json({ status: 'ok', service: opts.name }));
   app.get('/i18n', (_req, res) => res.json({ languages: LANGUAGES }));
   app.get('/i18n/:lang.json', (req, res) => { res.setHeader('cache-control', 'public, max-age=300'); res.json(dictionaries[normalizeLang(req.params.lang)]); });
@@ -55,7 +56,7 @@ export function createApp(opts: { name: string; staticDirs?: string[]; sharedWeb
     res.type('image/svg+xml').setHeader('cache-control', 'no-store').send(svg);
   }));
   if (opts.sharedWebDir) app.use('/shared', express.static(opts.sharedWebDir, { maxAge: '5m' }));
-  for (const d of opts.staticDirs ?? []) app.use(express.static(d, { extensions: ['html'], maxAge: '1m' }));
+  for (const d of opts.staticDirs ?? []) app.use(express.static(d, { maxAge: '1m' }));
   return app;
 }
 

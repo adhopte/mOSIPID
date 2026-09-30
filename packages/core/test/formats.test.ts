@@ -104,6 +104,15 @@ test('MRZ: ICAO specimen TD3 parses with valid checksums; OCR noise is repaired'
   assert.equal(ageOver('2010-01-01', 18, new Date('2026-09-30')), false);
 });
 
+test('MRZ: real Tesseract output (O/0 in nationality, garbled composite digit) is repaired', () => {
+  const ocr = 'PASSEPORT\nP<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<L<\nL898902C36UT07408122F2909303<<<<<<<<<<<<<<<H\n';
+  const m = extractMrz(ocr);
+  assert.ok(m?.checksOk, JSON.stringify(m?.checks));
+  assert.equal(m!.nationality, 'UTO'); assert.equal(m!.documentNumber, 'L898902C3'); assert.equal(m!.givenNames, 'ANNA MARIA');
+  // a genuinely wrong field-level digit must NOT be papered over
+  assert.equal(extractMrz('P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<\nL898902C46UTO7408122F2909303<<<<<<<<<<<<<<<6')?.checksOk, false);
+});
+
 test('ISO 18013-5 session: engagement, key agreement and encrypted request/response', () => {
   const dev = generateKeyPair(), rdr = generateKeyPair();
   const eng = buildDeviceEngagement(dev, { url: 'https://relay.test', sessionId: 'abc' });
