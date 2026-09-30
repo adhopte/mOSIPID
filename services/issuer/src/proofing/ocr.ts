@@ -16,8 +16,16 @@ async function worker() {
   return workerP;
 }
 
+let queue: Promise<unknown> = Promise.resolve();
+/** Runs OCR jobs strictly one at a time so concurrent uploads cannot multiply memory use. */
+const serial = <T,>(fn: () => Promise<T>): Promise<T> => { const r = queue.then(fn, fn); queue = r.catch(() => {}); return r; };
+
 /** Finds and parses the MRZ from a document photo. `debugMrz` is honoured only with OCR_PROVIDER=mock. */
-export async function readMrzFromImage(cfg: IssuerConfig, image: Uint8Array, debugMrz?: string[]): Promise<MrzData | null> {
+export function readMrzFromImage(cfg: IssuerConfig, image: Uint8Array, debugMrz?: string[]): Promise<MrzData | null> {
+  return cfg.ocrProvider === 'mock' ? readMrz(cfg, image, debugMrz) : serial(() => readMrz(cfg, image, debugMrz));
+}
+
+async function readMrz(cfg: IssuerConfig, image: Uint8Array, debugMrz?: string[]): Promise<MrzData | null> {
   if (cfg.ocrProvider === 'mock') {
     if (!debugMrz) return null;
     return extractMrz(debugMrz.join('\n'));

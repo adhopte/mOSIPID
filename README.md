@@ -52,11 +52,12 @@ Tests: `npm test` · type-check: `npm run typecheck` · production build: `npm r
 With Postgres: `TEST_DATABASE_URL=postgres://… npm test`. Real OCR: `RUN_OCR=1 npm test -w @mosipid/issuer`.
 
 ## Deploy on Render
-Step-by-step in **[docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md)** (uses the `render.yaml` Blueprint: 3 web services + Postgres).
+Step-by-step in **[docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md)** (Blueprint: 3 web services + Postgres; asks for a card). **No card?** Use **[docs/DEPLOY_RENDER_FREE.md](docs/DEPLOY_RENDER_FREE.md)**: 3 Free web services + a free Neon Postgres.
 
 ## Documents
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – flows, credential formats, trust model, security notes, real-vs-mocked table
-- [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md) – deployment guide
+- [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md) – deployment guide (Blueprint)
+- [docs/DEPLOY_RENDER_FREE.md](docs/DEPLOY_RENDER_FREE.md) – deploy with no card (free web services + Neon)
 - [docs/MOBILE.md](docs/MOBILE.md) – building/running the two apps, NFC notes, pointing apps at your servers
 
 ## Relationship to MOSIP Inji

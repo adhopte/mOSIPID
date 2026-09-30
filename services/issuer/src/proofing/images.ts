@@ -2,7 +2,10 @@
 let sharpMod: any | null | undefined;
 async function sharp() {
   if (sharpMod !== undefined) return sharpMod;
-  try { sharpMod = (await import('sharp' as string)).default; } catch { sharpMod = null; }
+  try {
+    sharpMod = (await import('sharp' as string)).default;
+    sharpMod.cache(false); sharpMod.concurrency(1); // keep memory flat on 512 MB instances
+  } catch { sharpMod = null; }
   return sharpMod;
 }
 
