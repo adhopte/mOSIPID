@@ -1,3 +1,4 @@
+import { logEvent } from '../history';
 import React, { useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import {
@@ -53,7 +54,7 @@ export function OfferScreen({ uri, onClose, onIssued }: { uri: string; onClose: 
           return r.url;
         },
       }));
-    } catch (e: any) { setError(e.message); setStep('error'); }
+    } catch (e: any) { setError(e.message); setStep('error'); void logEvent({ type: 'failed', title: names.join(', ') || 'credential', counterparty: issuerName, detail: String(e.message).slice(0, 200) }); }
   };
 
   const accept = () => {

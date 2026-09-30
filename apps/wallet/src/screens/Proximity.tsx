@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { HolderProximity, ProximityRequest, StoredCredential } from '@mosipid/core';
-import { authenticate } from '../lock';
+import { useSecurity } from '../SecurityContext';
+import { logEvent } from '../history';
 import { useI18n, useServers, Button, Card, ErrorBox, H, P, Screen, QrCode } from '@mosipid/mobile-kit';
 
 /** Holder side of the ISO 18013-5 flow: show the device-engagement QR, get asked, approve, respond. */
 export function ProximityScreen({ credentials, onClose }: { credentials: StoredCredential[]; onClose: () => void }) {
   const { t } = useI18n();
+  const { confirm } = useSecurity();
   const { verifierUrl } = useServers();
   const holder = useRef<HolderProximity | null>(null);
   const [qr, setQr] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export function ProximityScreen({ credentials, onClose }: { credentials: StoredC
 
   const approve = async () => {
     if (!asked || !holder.current) return;
-    if (!(await authenticate(t('w.present.confirmAuth')))) return;
+    if (!(await confirm(t('w.present.confirmAuth')))) return;
     try {
       if (asked.sdjwt) {
         const cred = credentials.find((c) => c.format === 'dc+sd-jwt' && c.vct === asked.sdjwt!.vct);
@@ -43,9 +45,11 @@ export function ProximityScreen({ credentials, onClose }: { credentials: StoredC
         await holder.current.respond(docs);
       }
       setState('done');
-    } catch (e: any) { setError(e.message); setState('error'); }
+      void logEvent({ type: 'shared', title: sharedTitle(), channel: 'proximity', claims: asked.sdjwt ? asked.sdjwt.claims : Object.values(asked.mdoc).flatMap((ns) => Object.values(ns).flat()) });
+    } catch (e: any) { setError(e.message); setState('error'); void logEvent({ type: 'failed', title: sharedTitle(), channel: 'proximity', detail: String(e.message).slice(0, 200) }); }
   };
-  const decline = async () => { try { await holder.current?.decline(); } catch { /* ignore */ } onClose(); };
+  const sharedTitle = () => asked?.sdjwt ? (credentials.find((c) => c.vct === asked.sdjwt!.vct)?.title ?? 'SD-JWT VC') : Object.keys(asked?.mdoc ?? {}).map((d) => credentials.find((c) => c.docType === d)?.title ?? d).join(', ');
+  const decline = async () => { void logEvent({ type: 'declined', title: sharedTitle(), channel: 'proximity' }); try { await holder.current?.decline(); } catch { /* ignore */ } onClose(); };
 
   return (
     <Screen title={t('w.prox.title')} onBack={onClose}>

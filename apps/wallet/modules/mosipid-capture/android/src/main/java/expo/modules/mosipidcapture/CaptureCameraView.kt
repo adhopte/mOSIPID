@@ -16,6 +16,8 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -58,6 +60,7 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var lastNonce = 0
   private var provider: ProcessCameraProvider? = null
   private var imageCapture: ImageCapture? = null
+  private var boundCases: List<UseCase> = emptyList()
   private var liveness: LivenessAnalyzer? = null
   private val analysisExecutor = Executors.newSingleThreadExecutor()
   private val ioExecutor = Executors.newSingleThreadExecutor()
@@ -87,6 +90,7 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
 
   private fun bind() {
     val activity = appContext.currentActivity as? AppCompatActivity ?: return error("no activity")
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return error("camera_permission")
     boundMode = mode
     boundActive = true
     val future = ProcessCameraProvider.getInstance(context)
@@ -94,7 +98,9 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
       try {
         val p = future.get()
         provider = p
-        p.unbindAll()
+        // only release OUR use cases – another camera view (e.g. the one being torn down) may share the provider
+        if (boundCases.isNotEmpty()) p.unbind(*boundCases.toTypedArray())
+        boundCases = emptyList()
         liveness?.close(); liveness = null; imageCapture = null
         val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
         val analysis = ImageAnalysis.Builder()
@@ -124,6 +130,7 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
           cases.add(cap)
         }
         p.bindToLifecycle(activity, selector, *cases.toTypedArray())
+        boundCases = cases
       } catch (e: Exception) {
         boundActive = false
         error(e.message)
@@ -136,7 +143,9 @@ class CaptureCameraView(context: Context, appContext: AppContext) : ExpoView(con
     boundMode = null
     liveness?.close(); liveness = null
     imageCapture = null
-    runCatching { provider?.unbindAll() }
+    val c = boundCases
+    boundCases = emptyList()
+    if (c.isNotEmpty()) runCatching { provider?.unbind(*c.toTypedArray()) }
   }
 
   fun shutdown() {

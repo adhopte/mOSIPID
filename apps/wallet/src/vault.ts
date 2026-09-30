@@ -32,3 +32,19 @@ export async function saveCredentials(list: StoredCredential[]) {
   const out = new Uint8Array(12 + ct.length); out.set(nonce); out.set(ct, 12);
   await AsyncStorage.setItem(DATA, toBase64(out));
 }
+
+/** Generic encrypted-at-rest JSON blob (same AES-256-GCM vault key) – used for the activity history. */
+export async function loadSealed<T>(name: string, fallback: T): Promise<T> {
+  const raw = await AsyncStorage.getItem(name);
+  if (!raw) return fallback;
+  try {
+    const buf = fromBase64(raw);
+    return JSON.parse(fromUtf8(gcm(await vaultKey(), buf.subarray(0, 12)).decrypt(buf.subarray(12))));
+  } catch { return fallback; }
+}
+export async function saveSealed(name: string, value: unknown) {
+  const nonce = randomBytes(12);
+  const ct = gcm(await vaultKey(), nonce).encrypt(utf8(JSON.stringify(value)));
+  const out = new Uint8Array(12 + ct.length); out.set(nonce); out.set(ct, 12);
+  await AsyncStorage.setItem(name, toBase64(out));
+}

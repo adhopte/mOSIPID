@@ -26,11 +26,12 @@ function CredentialCard({ c, onPress }: { c: StoredCredential; onPress: () => vo
   );
 }
 
-export function HomeScreen(p: { credentials: StoredCredential[]; onOpen: (c: StoredCredential) => void; onScan: () => void; onGetId: (m: 'nfc' | 'ocr') => void; onGetDegree: () => void; onProximity: () => void; onSettings: () => void; onHelp: () => void; busy?: boolean }) {
+export function HomeScreen(p: { credentials: StoredCredential[]; onOpen: (c: StoredCredential) => void; onScan: () => void; onGetId: (m: 'nfc' | 'ocr') => void; onGetDegree: () => void; onProximity: () => void; onSettings: () => void; onHelp: () => void; onHistory: () => void; busy?: boolean }) {
   const { t } = useI18n();
   const { name } = useBrand();
   return (
     <Screen title={name} right={<View style={{ flexDirection: 'row', gap: 18 }}>
+      <Pressable onPress={p.onHistory} accessibilityRole="button" accessibilityLabel={t('w.hist.title')} hitSlop={12}><Text style={{ color: '#fff', fontSize: 22 }}>🕘</Text></Pressable>
       <Pressable onPress={p.onHelp} accessibilityRole="button" accessibilityLabel={t('w.tut.replay')} hitSlop={12}><Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>?</Text></Pressable>
       <Pressable onPress={p.onSettings} accessibilityRole="button" accessibilityLabel={t('w.settings.title')} hitSlop={12}><Text style={{ color: '#fff', fontSize: 24 }}>⚙︎</Text></Pressable></View>}>
       {p.credentials.length === 0 ? (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
+import { useCameraPermissions } from 'expo-camera';
 import { useI18n, useBrand, Button, Card, ErrorBox, P } from '@mosipid/mobile-kit';
 import { CaptureCameraView, LivenessResult, LivenessUi, captureAvailable, readBase64 } from '../../modules/mosipid-capture';
 import { SelfieCapture } from './Capture';
@@ -19,6 +20,9 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
   const [ui, setUi] = useState<LivenessUi | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [perm, requestPerm] = useCameraPermissions();
+
+  React.useEffect(() => { if (perm && !perm.granted && perm.canAskAgain) requestPerm(); }, [perm?.granted]);
 
   if (!captureAvailable) {
     return <SelfieCapture onDone={(r) => onDone({ selfie: r.selfie, turnLeft: r.frames[1], turnRight: r.frames[2], report: { method: 'timed_frames' } })} />;
@@ -53,7 +57,9 @@ export function LivenessCapture({ onDone }: { onDone: (r: SelfieResult) => void 
       ) : (
         <>
           <P style={{ textAlign: 'center' }}>{t('w.live.intro')}</P>
-          <Button label={t('w.selfie.start')} onPress={() => { setError(null); setUi(null); setStarted(true); }} />
+          {perm?.granted
+            ? <Button label={t('w.selfie.start')} onPress={() => { setError(null); setUi(null); setStarted(true); }} />
+            : <><P muted style={{ textAlign: 'center' }}>{t('w.scan.permission')}</P><Button label={t('w.scan.grant')} onPress={requestPerm} /></>}
         </>
       )}
       <ErrorBox message={error} />
